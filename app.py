@@ -150,17 +150,17 @@ class SystemSquire:
             time.sleep(0.1)
             
             # Send monitor power off command
-            # SC_MONITORPOWER = 0xF170
-            # MONITOR_OFF = 2
-            # windll.user32.SendMessageTimeoutW(
-            #     0xFFFF,  # HWND_BROADCAST
-            #     0x0112,  # WM_SYSCOMMAND
-            #     SC_MONITORPOWER,
-            #     MONITOR_OFF,
-            #     0x0002,  # SMTO_ABORTIFHUNG
-            #     1000,
-            #     None
-            # )
+            SC_MONITORPOWER = 0xF170
+            MONITOR_OFF = 2
+            windll.user32.SendMessageTimeoutW(
+                0xFFFF,  # HWND_BROADCAST
+                0x0112,  # WM_SYSCOMMAND
+                SC_MONITORPOWER,
+                MONITOR_OFF,
+                0x0002,  # SMTO_ABORTIFHUNG
+                1000,
+                None
+            )
             print("Monitor blackout activated")
         except Exception as e:
             print(f"Error during blackout: {e}")
