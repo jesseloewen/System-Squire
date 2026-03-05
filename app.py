@@ -12,7 +12,7 @@ import json
 import os
 import sys
 from tkinter import messagebox
-from ctypes import windll
+from ctypes import windll, c_wchar_p
 import pystray
 from PIL import Image, ImageDraw
 
@@ -101,26 +101,66 @@ class SystemSquire:
         self.cooldown_active = False
         print("Cooldown complete")
     
+    def _wait_for_dummy_window(self, timeout=3.0):
+        """Wait for Dummy window to appear and activate it"""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            # Check if window with title "Dummy" exists
+            hwnd = windll.user32.FindWindowW(None, c_wchar_p("Dummy"))
+            if hwnd != 0:
+                print(f"Dummy window found (hwnd: {hwnd})")
+                
+                # Activate the window to bring it to foreground
+                windll.user32.SetForegroundWindow(hwnd)
+                windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE = 9
+                
+                # Give it a bit more time to fully activate
+                time.sleep(0.3)
+                return hwnd
+            time.sleep(0.1)  # Check every 100ms
+        
+        print("Warning: Dummy window not found within timeout")
+        return 0
+    
     def blackout_screen(self):
         """Turn off monitor display"""
         try:
             # Run dummy.exe first and wait for it to become active
             if os.path.exists(self.dummy_path):
+                print(f"Launching Dummy from: {self.dummy_path}")
                 subprocess.Popen([self.dummy_path])
-                time.sleep(1)  # Wait for dummy to fully open and become active window
+                
+                # Wait for dummy window to actually open and activate it
+                hwnd = self._wait_for_dummy_window(timeout=3.0)
+                if hwnd == 0:
+                    print("Warning: Proceeding with blackout despite dummy window not detected")
+            else:
+                print(f"Warning: Dummy.exe not found at {self.dummy_path}")
+            
+            # Release all modifier keys to prevent them from getting stuck
+            # This is critical when using hotkeys with modifiers (ctrl, alt, etc.)
+            modifier_keys = ['ctrl', 'alt', 'shift', 'win']
+            for key in modifier_keys:
+                try:
+                    keyboard.release(key)
+                except:
+                    pass
+            
+            # Small delay to ensure keys are released
+            time.sleep(0.1)
             
             # Send monitor power off command
-            SC_MONITORPOWER = 0xF170
-            MONITOR_OFF = 2
-            windll.user32.SendMessageTimeoutW(
-                0xFFFF,  # HWND_BROADCAST
-                0x0112,  # WM_SYSCOMMAND
-                SC_MONITORPOWER,
-                MONITOR_OFF,
-                0x0002,  # SMTO_ABORTIFHUNG
-                1000,
-                None
-            )
+            # SC_MONITORPOWER = 0xF170
+            # MONITOR_OFF = 2
+            # windll.user32.SendMessageTimeoutW(
+            #     0xFFFF,  # HWND_BROADCAST
+            #     0x0112,  # WM_SYSCOMMAND
+            #     SC_MONITORPOWER,
+            #     MONITOR_OFF,
+            #     0x0002,  # SMTO_ABORTIFHUNG
+            #     1000,
+            #     None
+            # )
             print("Monitor blackout activated")
         except Exception as e:
             print(f"Error during blackout: {e}")

@@ -48,10 +48,13 @@ python build_app.py  # Creates System Squire.exe and Dummy.exe in dist/
 
 ### Interaction Flow
 ```
-Blackout hotkey → Launch Dummy.exe → Wait 300ms →
+Blackout hotkey → Launch Dummy.exe → Wait for window to appear (max 3s) →
+Activate/bring Dummy to foreground → Release all modifier keys →
 Turn off monitors → Dummy stays open (detectable) →
 User input anywhere → Dummy closes → Monitors wake
 ```
+
+The app uses `FindWindowW` API to verify the Dummy window actually opens before sending the monitor power-off command. It also explicitly releases all modifier keys (ctrl, alt, shift, win) to prevent them from getting stuck when the monitor turns off.
 
 ### Dual-Mode Path Resolution
 The app automatically detects if it's running as a script or compiled executable:
@@ -99,6 +102,14 @@ threading.Thread(target=self._cooldown_timer, daemon=True).start()
 ```python
 # Monitor control
 windll.user32.SendMessageTimeoutW(0xFFFF, 0x0112, SC_MONITORPOWER, MONITOR_OFF, 0x0002, 1000, None)
+
+# Window activation
+windll.user32.SetForegroundWindow(hwnd)
+windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+
+# Releasing modifier keys to prevent stuck keys
+for key in ['ctrl', 'alt', 'shift', 'win']:
+    keyboard.release(key)
 ```
 
 ## Common Issues
