@@ -1,0 +1,239 @@
+<Window x:Class="SystemSquire.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:tb="http://www.hardcodet.net/taskbar"
+        Title="System Squire" 
+        Height="600" Width="800"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanMinimize"
+        Background="#1E1E1E"
+        Closing="Window_Closing">
+    
+    <Window.Resources>
+        <!-- Modern Dark Theme Styles -->
+        <Style TargetType="Label">
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="#2D2D2D"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#3E3E42"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Height" Value="35"/>
+        </Style>
+        
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#0E639C"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" 
+                                            VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#1177BB"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#0D5A8F"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="RecordButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="#2D2D2D"/>
+            <Setter Property="Width" Value="100"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#3E3E42"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SaveButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="#0E8C0E"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Height" Value="40"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#10A010"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <tb:TaskbarIcon x:Key="TrayIcon"
+                        ToolTipText="System Squire">
+            <tb:TaskbarIcon.ContextMenu>
+                <ContextMenu Background="#2D2D2D">
+                    <MenuItem Header="Show Window" Click="MenuItem_Show_Click" 
+                             Foreground="White"/>
+                    <Separator/>
+                    <MenuItem Header="Exit" Click="MenuItem_Exit_Click"
+                             Foreground="White"/>
+                </ContextMenu>
+            </tb:TaskbarIcon.ContextMenu>
+        </tb:TaskbarIcon>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock Text="⚙️ System Squire" 
+                      FontSize="36" 
+                      FontWeight="Bold" 
+                      Foreground="#FFFFFF"
+                      HorizontalAlignment="Center"/>
+            <TextBlock Text="Advanced System Control &amp; Hotkey Manager" 
+                      FontSize="16" 
+                      Foreground="#888888"
+                      HorizontalAlignment="Center"
+                      Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- Status Panel -->
+        <Border Grid.Row="1" 
+                Background="#2D2D2D" 
+                CornerRadius="8" 
+                Padding="15"
+                Margin="0,0,0,20">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Status:" 
+                          FontSize="16" 
+                          FontWeight="Bold" 
+                          Foreground="White"
+                          VerticalAlignment="Center"/>
+                <Ellipse x:Name="StatusIndicator" 
+                        Width="12" 
+                        Height="12" 
+                        Fill="#2ECC71"
+                        Margin="10,0,10,0"/>
+                <TextBlock x:Name="StatusText" 
+                          Text="Monitoring Active" 
+                          FontSize="16" 
+                          Foreground="#2ECC71"
+                          VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Hotkey Configuration -->
+        <Border Grid.Row="2" 
+                Background="#2D2D2D" 
+                CornerRadius="8" 
+                Padding="20"
+                Margin="0,0,0,20">
+            <StackPanel>
+                <TextBlock Text="Hotkey Configuration" 
+                          FontSize="20" 
+                          FontWeight="Bold" 
+                          Foreground="White"
+                          Margin="0,0,0,15"/>
+
+                <!-- Shutdown Hotkey -->
+                <Grid Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="110"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Label Content="Shutdown:" 
+                           Grid.Column="0" 
+                           VerticalAlignment="Center"/>
+                    <TextBox x:Name="ShutdownHotkeyBox" 
+                            Grid.Column="1" 
+                            Margin="0,0,10,0"
+                            IsReadOnly="True"/>
+                    <Button Content="⏺ Record" 
+                           Grid.Column="2"
+                           Style="{StaticResource RecordButton}"
+                           Click="RecordShutdownHotkey_Click"/>
+                </Grid>
+
+                <!-- Blackout Hotkey -->
+                <Grid Margin="0,0,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="110"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Label Content="Blackout:" 
+                           Grid.Column="0" 
+                           VerticalAlignment="Center"/>
+                    <TextBox x:Name="BlackoutHotkeyBox" 
+                            Grid.Column="1" 
+                            Margin="0,0,10,0"
+                            IsReadOnly="True"/>
+                    <Button Content="⏺ Record" 
+                           Grid.Column="2"
+                           Style="{StaticResource RecordButton}"
+                           Click="RecordBlackoutHotkey_Click"/>
+                </Grid>
+
+                <!-- Save Button -->
+                <Button Content="💾 Save Configuration" 
+                       Style="{StaticResource SaveButton}"
+                       Margin="0,20,0,0"
+                       Click="SaveConfig_Click"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Theme Settings -->
+        <Border Grid.Row="3" 
+                Background="#2D2D2D" 
+                CornerRadius="8" 
+                Padding="20"
+                VerticalAlignment="Top">
+            <StackPanel>
+                <TextBlock Text="Settings" 
+                          FontSize="20" 
+                          FontWeight="Bold" 
+                          Foreground="White"
+                          Margin="0,0,0,15"/>
+                
+                <CheckBox x:Name="DarkModeCheckBox"
+                         Content="Dark Mode (Restart required)"
+                         Foreground="White"
+                         FontSize="14"
+                         IsChecked="True"
+                         Margin="0,0,0,10"/>
+                
+                <CheckBox x:Name="StartMinimizedCheckBox"
+                         Content="Start Minimized to Tray"
+                         Foreground="White"
+                         FontSize="14"
+                         IsChecked="True"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Footer -->
+        <TextBlock Grid.Row="4" 
+                  Text="System Squire v2.0 • Made with C# WPF" 
+                  FontSize="12" 
+                  Foreground="#666666"
+                  HorizontalAlignment="Center"
+                  Margin="0,20,0,0"/>
+    </Grid>
+</Window>

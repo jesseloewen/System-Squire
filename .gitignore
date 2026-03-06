@@ -1,31 +1,39 @@
-# Python build artifacts
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
+# Build Outputs
+bin/
+obj/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-scripts/
 
-# PyInstaller
-*.spec
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
 
-# Config files (user-specific)
+# Configuration
 config.json
+
+# Visual Studio
+.vs/
+*.vsidx
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.log
+*.tlog
+
+# ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+# NCrunch
+*.ncrunch*
+.*crunch*.local.xml
+
+# NuGet Packages
+*.nupkg
+packages/
+!**/packages/build/
 
 # IDEs
 .vscode/
@@ -38,6 +46,3 @@ config.json
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# Logs
-*.log
