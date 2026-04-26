@@ -7,8 +7,7 @@ A Windows desktop application for advanced system control via global hotkeys. Bu
 - **Smart Shutdown**: Initiate system shutdown with 10-second countdown
   - Press hotkey again to cancel
   - 5-second cooldown after cancellation
-- **Monitor Blackout**: Turn off monitors with external process detection
-  - Launches detection window (Dummy.exe)
+- **Monitor Blackout**: Turn off monitors immediately
   - Any mouse movement or keyboard input wakes monitors
 - **Configurable Hotkeys**: Record custom key combinations
   - Default: `Ctrl+Alt+F8` (Shutdown), `Ctrl+Alt+F7` (Blackout)
@@ -39,21 +38,17 @@ A Windows desktop application for advanced system control via global hotkeys. Bu
    dotnet build SystemSquire.sln --configuration Release
    ```
 
-3. Executables will be in:
-   - `SystemSquire\bin\Release\net8.0-windows\System Squire.exe`
-   - `DummyWindow\bin\Release\net8.0-windows\Dummy.exe`
+3. Executable will be in:
+  - `SystemSquire\bin\Release\net8.0-windows\System Squire.exe`
 
 ### Creating a Distributable Package
 
-After building in Release mode, copy both executables to the same folder:
+After building in Release mode, copy the application output to a folder:
 ```powershell
 mkdir dist
 copy SystemSquire\bin\Release\net8.0-windows\*.exe dist\
 copy SystemSquire\bin\Release\net8.0-windows\*.dll dist\
-copy DummyWindow\bin\Release\net8.0-windows\Dummy.exe dist\
 ```
-
-**Important**: `Dummy.exe` must be in the same directory as `System Squire.exe`.
 
 ## Running the Application
 
@@ -94,7 +89,6 @@ For full system-wide hotkey detection (including in elevated applications):
 ### Blackout Function
 - Press configured blackout hotkey (default: `Ctrl+Alt+F7`)
 - Monitors turn off immediately
-- Dummy.exe window opens (detectable by external software)
 - Move mouse or press any key to wake monitors
 
 ## Architecture
@@ -118,12 +112,6 @@ The application uses Windows `SetWindowsHookEx` with `WH_KEYBOARD_LL` to interce
 - **ConfigManager.cs**: JSON-based configuration persistence
 - **MainWindow.xaml**: WPF GUI with modern styling
 
-#### DummyWindow (Detection Window)
-- Separate executable launched during blackout
-- Creates visible window for external detection
-- Uses global mouse/keyboard hooks
-- Closes on any input (mouse or keyboard)
-
 ### Configuration
 Settings are stored in `config.json` in the application directory:
 ```json
@@ -143,8 +131,7 @@ Settings are stored in `config.json` in the application directory:
 - **Check Configuration**: Verify settings saved correctly
 
 ### Blackout Not Working
-- **Missing Dummy.exe**: Ensure `Dummy.exe` is in same folder as main executable
-- **Build Both Projects**: Make sure DummyWindow project is built
+- **Display Driver/OS Behavior**: Some systems may ignore monitor power messages
 
 ### Application Won't Start
 - **.NET Runtime**: Install .NET 8.0 Runtime from Microsoft
@@ -155,7 +142,6 @@ Settings are stored in `config.json` in the application directory:
 ### Windows API Usage
 - `SetWindowsHookEx`: Low-level keyboard/mouse hooks
 - `SendMessage`: Monitor power management
-- `FindWindow/SetForegroundWindow`: Window management
 - `shutdown.exe`: System shutdown command
 
 ### Why C# Over Python?

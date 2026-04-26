@@ -4,6 +4,8 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <AssemblyName>System Squire</AssemblyName>
+    <ApplicationIcon>Assets\system-squire-icon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <Win32Resource />
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -11,5 +13,10 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\system-squire-icon.png" />
+    <Resource Include="Assets\system-squire-icon.ico" />
   </ItemGroup>
 </Project>

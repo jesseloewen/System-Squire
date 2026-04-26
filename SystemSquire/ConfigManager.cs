@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
 
@@ -13,6 +14,10 @@ namespace SystemSquire
         public string BlackoutHotkey { get; set; } = "Ctrl+Alt+F7";
         public bool DarkMode { get; set; } = true;
         public bool StartMinimized { get; set; } = true;
+        public List<string> AppsToKillBeforeShutdown { get; set; } = new();
+        public List<string> AppsToWatchAfterLaunch { get; set; } = new();
+        public int LaunchWatchDurationMinutes { get; set; } = 1;
+        public int LaunchMinimizeDelaySeconds { get; set; } = 0;
     }
 
     /// <summary>
@@ -21,13 +26,20 @@ namespace SystemSquire
     public class ConfigManager
     {
         private const string ConfigFileName = "config.json";
+        private const string AppFolderName = "SystemSquire";
         private readonly string _configPath;
+        private readonly string _legacyConfigPath;
 
         public AppConfig Config { get; private set; }
 
         public ConfigManager()
         {
-            _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ConfigFileName);
+            string appDataDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                AppFolderName);
+
+            _configPath = Path.Combine(appDataDirectory, ConfigFileName);
+            _legacyConfigPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ConfigFileName);
             Config = LoadConfig();
         }
 
@@ -35,11 +47,17 @@ namespace SystemSquire
         {
             try
             {
-                if (File.Exists(_configPath))
+                if (TryReadConfig(_configPath, out AppConfig appDataConfig))
                 {
-                    string json = File.ReadAllText(_configPath);
-                    var config = JsonConvert.DeserializeObject<AppConfig>(json);
-                    return config ?? new AppConfig();
+                    return appDataConfig;
+                }
+
+                // Migrate legacy config that was previously stored beside the executable.
+                if (TryReadConfig(_legacyConfigPath, out AppConfig legacyConfig))
+                {
+                    Config = legacyConfig;
+                    SaveConfig();
+                    return legacyConfig;
                 }
             }
             catch (Exception ex)
@@ -54,6 +72,12 @@ namespace SystemSquire
         {
             try
             {
+                string? configDirectory = Path.GetDirectoryName(_configPath);
+                if (!string.IsNullOrWhiteSpace(configDirectory))
+                {
+                    Directory.CreateDirectory(configDirectory);
+                }
+
                 string json = JsonConvert.SerializeObject(Config, Formatting.Indented);
                 File.WriteAllText(_configPath, json);
             }
@@ -61,6 +85,26 @@ namespace SystemSquire
             {
                 System.Diagnostics.Debug.WriteLine($"Error saving config: {ex.Message}");
             }
+        }
+
+        private static bool TryReadConfig(string path, out AppConfig config)
+        {
+            config = new AppConfig();
+
+            if (!File.Exists(path))
+            {
+                return false;
+            }
+
+            string json = File.ReadAllText(path);
+            AppConfig? parsed = JsonConvert.DeserializeObject<AppConfig>(json);
+            if (parsed == null)
+            {
+                return false;
+            }
+
+            config = parsed;
+            return true;
         }
     }
 }
