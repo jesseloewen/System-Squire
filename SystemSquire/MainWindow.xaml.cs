@@ -43,7 +43,6 @@ namespace SystemSquire
                 TriggerBlackoutFromRemoteAsync,
                 TriggerLockDesktopFromRemoteAsync,
                 SaveRemoteConfigAsync,
-                SetWakeOnLanFromRemoteAsync,
                 GetRemoteWebAuthSettings,
                 VerifyRemoteWebPassword);
 
@@ -923,7 +922,6 @@ namespace SystemSquire
                 StartMinimized = StartMinimizedCheckBox.IsChecked == true,
                 LaunchWatchDurationMinutes = GetLaunchWatchDurationMinutes(),
                 LaunchMinimizeDelaySeconds = GetLaunchMinimizeDelaySeconds(),
-                EthernetWakeOnLanEnabled = EthernetWolCheckBox.IsChecked,
                 AppsToKillBeforeShutdown = GetConfiguredAppEntries(AppsToKillListBox),
                 AppsToWatchAfterLaunch = GetConfiguredAppEntries(AppsToWatchAtLaunchListBox),
                 RunningApplications = GetRunningApplications(),
@@ -1007,45 +1005,6 @@ namespace SystemSquire
             {
                 Success = true,
                 Message = "Configuration saved.",
-                State = await GetRemoteControlStateAsync()
-            };
-        }
-
-        private async Task<RemoteOperationResponse> SetWakeOnLanFromRemoteAsync(RemoteWakeOnLanRequest request)
-        {
-            ElevatedOperationResult result = await Task.Run(
-                () => _systemOps.SetEthernetWakeOnLanEnabled(request.Enabled, EthernetAdapterName));
-
-            if (result == ElevatedOperationResult.Cancelled)
-            {
-                return new RemoteOperationResponse
-                {
-                    Success = false,
-                    Message = "Wake-on-LAN change canceled because administrator approval was not granted.",
-                    State = await GetRemoteControlStateAsync()
-                };
-            }
-
-            if (result == ElevatedOperationResult.Failed)
-            {
-                return new RemoteOperationResponse
-                {
-                    Success = false,
-                    Message = "Failed to change Wake-on-LAN setting.",
-                    State = await GetRemoteControlStateAsync()
-                };
-            }
-
-            await InvokeOnUiThreadAsync(() =>
-            {
-                SaveEthernetWakeOnLanState(request.Enabled);
-                RefreshEthernetWakeOnLanState();
-            });
-
-            return new RemoteOperationResponse
-            {
-                Success = true,
-                Message = $"Wake-on-LAN set to {(request.Enabled ? "ON" : "OFF")}.",
                 State = await GetRemoteControlStateAsync()
             };
         }

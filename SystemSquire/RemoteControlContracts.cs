@@ -10,7 +10,6 @@ namespace SystemSquire
         public bool StartMinimized { get; set; } = true;
         public int LaunchWatchDurationMinutes { get; set; } = 1;
         public int LaunchMinimizeDelaySeconds { get; set; } = 0;
-        public bool? EthernetWakeOnLanEnabled { get; set; }
         public List<ConfiguredAppEntry> AppsToKillBeforeShutdown { get; set; } = new();
         public List<ConfiguredAppEntry> AppsToWatchAfterLaunch { get; set; } = new();
         public List<string> RunningApplications { get; set; } = new();
@@ -29,11 +28,6 @@ namespace SystemSquire
         public List<ConfiguredAppEntry> AppsToKillBeforeShutdown { get; set; } = new();
         public List<ConfiguredAppEntry> AppsToWatchAfterLaunch { get; set; } = new();
         public PushoverConfig? Pushover { get; set; }
-    }
-
-    public sealed class RemoteWakeOnLanRequest
-    {
-        public bool Enabled { get; set; }
     }
 
     public sealed class RemoteWebAuthSettings

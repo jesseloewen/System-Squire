@@ -28,7 +28,6 @@ namespace SystemSquire
         private readonly Func<Task<RemoteOperationResponse>> _triggerBlackoutAsync;
         private readonly Func<Task<RemoteOperationResponse>> _triggerLockDesktopAsync;
         private readonly Func<RemoteConfigUpdateRequest, Task<RemoteOperationResponse>> _saveConfigAsync;
-        private readonly Func<RemoteWakeOnLanRequest, Task<RemoteOperationResponse>> _setWakeOnLanAsync;
         private readonly Func<RemoteWebAuthSettings> _getWebAuthSettings;
         private readonly Func<string, bool> _verifyWebPassword;
         private readonly object _syncRoot = new();
@@ -64,7 +63,6 @@ namespace SystemSquire
             Func<Task<RemoteOperationResponse>> triggerBlackoutAsync,
             Func<Task<RemoteOperationResponse>> triggerLockDesktopAsync,
             Func<RemoteConfigUpdateRequest, Task<RemoteOperationResponse>> saveConfigAsync,
-            Func<RemoteWakeOnLanRequest, Task<RemoteOperationResponse>> setWakeOnLanAsync,
             Func<RemoteWebAuthSettings> getWebAuthSettings,
             Func<string, bool> verifyWebPassword)
         {
@@ -73,7 +71,6 @@ namespace SystemSquire
             _triggerBlackoutAsync = triggerBlackoutAsync;
             _triggerLockDesktopAsync = triggerLockDesktopAsync;
             _saveConfigAsync = saveConfigAsync;
-            _setWakeOnLanAsync = setWakeOnLanAsync;
             _getWebAuthSettings = getWebAuthSettings;
             _verifyWebPassword = verifyWebPassword;
         }
@@ -728,26 +725,6 @@ namespace SystemSquire
                     return;
                 }
 
-                if (method == "POST" && path.Equals("/api/config/wol", StringComparison.OrdinalIgnoreCase))
-                {
-                    RemoteWakeOnLanRequest? request = await ReadJsonRequestAsync<RemoteWakeOnLanRequest>(context.Request)
-                        .ConfigureAwait(false);
-
-                    if (request == null)
-                    {
-                        await WriteJsonAsync(context, 400, new RemoteOperationResponse
-                        {
-                            Success = false,
-                            Message = "Invalid Wake-on-LAN payload."
-                        }).ConfigureAwait(false);
-                        return;
-                    }
-
-                    RemoteOperationResponse response = await _setWakeOnLanAsync(request).ConfigureAwait(false);
-                    await WriteJsonAsync(context, response.Success ? 200 : 400, response).ConfigureAwait(false);
-                    return;
-                }
-
                 await WriteJsonAsync(context, 404, new RemoteOperationResponse
                 {
                     Success = false,
@@ -1365,8 +1342,6 @@ namespace SystemSquire
             <div class="actions">
                 <button id="shutdownBtn" class="danger">Toggle Shutdown</button>
                 <button id="blackoutBtn" class="secondary">Trigger Blackout</button>
-                <button id="toggleWolBtn" class="success">Toggle Ethernet WoL</button>
-                <button id="reloadBtn" class="secondary">Reload State</button>
                 <button id="lockDesktopBtn" class="secondary">Lock Desktop</button>
             </div>
             <div id="messageBanner" class="banner"></div>
@@ -2077,7 +2052,7 @@ namespace SystemSquire
             suppressAutoSave = true;
             currentState = state;
             lastStateFingerprint = getStateFingerprint(state);
-            document.getElementById("statusText").textContent = `Status: ${state.statusText} | Service port: ${state.webServicePort} | WoL: ${state.ethernetWakeOnLanEnabled === null ? "Unknown" : (state.ethernetWakeOnLanEnabled ? "On" : "Off")}`;
+            document.getElementById("statusText").textContent = `Status: ${state.statusText} | Service port: ${state.webServicePort}`;
 
             document.getElementById("shutdownHotkey").value = state.shutdownHotkey || "";
             document.getElementById("blackoutHotkey").value = state.blackoutHotkey || "";
@@ -2148,7 +2123,7 @@ namespace SystemSquire
                     renderState(state);
                 }
             } catch {
-                // Ignore transient pull failures; manual reload remains available.
+                // Ignore transient pull failures.
             }
         }
 
@@ -2184,24 +2159,6 @@ namespace SystemSquire
 
         document.getElementById("blackoutBtn").addEventListener("click", () => {
             runAction("/api/action/blackout", {}, "Blackout triggered.");
-        });
-
-        document.getElementById("toggleWolBtn").addEventListener("click", () => {
-            if (!currentState || currentState.ethernetWakeOnLanEnabled === null) {
-                showMessage("Wake-on-LAN state is unknown right now.", true);
-                return;
-            }
-
-            runAction("/api/config/wol", { enabled: !currentState.ethernetWakeOnLanEnabled }, "Wake-on-LAN updated.");
-        });
-
-        document.getElementById("reloadBtn").addEventListener("click", async () => {
-            try {
-                await loadState();
-                showMessage("State reloaded.");
-            } catch (error) {
-                showMessage(error.message, true);
-            }
         });
 
         document.getElementById("lockDesktopBtn").addEventListener("click", () => {
