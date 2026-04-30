@@ -28,6 +28,16 @@
             <Setter Property="Height" Value="35"/>
         </Style>
 
+        <Style TargetType="PasswordBox">
+            <Setter Property="Background" Value="#2D2D2D"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#3E3E42"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Height" Value="35"/>
+        </Style>
+
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="#2D2D2D"/>
             <Setter Property="Foreground" Value="#FFFFFF"/>
@@ -82,6 +92,76 @@
             <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          Focusable="False"
+                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                          ClickMode="Press"
+                                          Background="{TemplateBinding Background}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <ContentPresenter HorizontalAlignment="Stretch"
+                                                          VerticalAlignment="Stretch"/>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                                <Border Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        CornerRadius="4"
+                                        Padding="{TemplateBinding Padding}">
+                                    <Grid>
+                                        <ContentPresenter Margin="0,0,24,0"
+                                                          VerticalAlignment="Center"
+                                                          HorizontalAlignment="Left"
+                                                          Content="{TemplateBinding SelectionBoxItem}"
+                                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                          ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>
+                                        <Path HorizontalAlignment="Right"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,8,0"
+                                              Fill="{TemplateBinding Foreground}"
+                                              Data="M 0 0 L 8 0 L 4 5 Z"/>
+                                    </Grid>
+                                </Border>
+                            </ToggleButton>
+
+                            <Popup x:Name="Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Border Background="#2D2D2D"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4"
+                                        Margin="0,2,0,0"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <ScrollViewer CanContentScroll="True"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsPresenter/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="HasItems" Value="False">
+                                <Setter TargetName="Popup" Property="MinHeight" Value="40"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.7"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="Button">
@@ -123,17 +203,6 @@
             </Style.Triggers>
         </Style>
 
-        <Style x:Key="SaveButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="#0E8C0E"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Height" Value="40"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#10A010"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
         <tb:TaskbarIcon x:Key="TrayIcon"
                         IconSource="Assets/system-squire-icon.ico"
                         ToolTipText="System Squire">
@@ -152,7 +221,6 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -244,18 +312,132 @@
                                Foreground="White"
                                Margin="0,0,0,10"/>
 
-                    <CheckBox x:Name="DarkModeCheckBox"
-                              Content="Dark Mode (Restart required)"
-                              Foreground="White"
-                              FontSize="14"
-                              IsChecked="True"
-                              Margin="0,0,0,10"/>
-
                     <CheckBox x:Name="StartMinimizedCheckBox"
                               Content="Start Minimized to Tray"
                               Foreground="White"
                               FontSize="14"
-                              IsChecked="True"/>
+                              IsChecked="True"
+                              Click="MainSettingChanged_Click"/>
+
+                        <Button x:Name="ConfigurePushoverButton"
+                            Content="Configure Pushover Notifications"
+                            Margin="0,12,0,0"
+                            Click="ConfigurePushover_Click"/>
+
+                    <Border Background="#252526"
+                            BorderBrush="#3E3E42"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12"
+                            Margin="0,14,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Web Remote Control"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       Foreground="White"
+                                       Margin="0,0,0,8"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="90"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Label Content="Service Port:"
+                                       Grid.Column="0"
+                                       VerticalAlignment="Center"/>
+                                <TextBox x:Name="WebServicePortBox"
+                                         Grid.Column="1"
+                                         HorizontalContentAlignment="Center"
+                                         Margin="8,0,8,0"
+                                         Text="7745"
+                                         LostFocus="MainSettingChanged_LostFocus"/>
+                                <TextBlock Grid.Column="2"
+                                           Text="Default: 7745"
+                                           Foreground="#9D9D9D"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <CheckBox x:Name="WebServiceAutoStartCheckBox"
+                                      Content="Start web service automatically with app"
+                                      Foreground="White"
+                                      FontSize="14"
+                                      Margin="0,10,0,0"
+                                      Click="MainSettingChanged_Click"/>
+
+                            <CheckBox x:Name="AutoOpenWebPageOnStartupCheckBox"
+                                      Content="Auto-open remote webpage on app startup"
+                                      Foreground="White"
+                                      FontSize="14"
+                                      Margin="0,6,0,0"
+                                      Click="MainSettingChanged_Click"/>
+
+                            <CheckBox x:Name="WebRequirePasswordCheckBox"
+                                      Content="Require password login for web remote"
+                                      Foreground="White"
+                                      FontSize="14"
+                                      Margin="0,6,0,0"
+                                      Click="WebRequirePasswordCheckBox_Click"/>
+
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="130"/>
+                                </Grid.ColumnDefinitions>
+
+                                <PasswordBox x:Name="WebPasswordBox"
+                                             Grid.Column="0"
+                                             PasswordChar="*"
+                                             ToolTip="Set or replace the web remote password"/>
+
+                                <Button x:Name="SetWebPasswordButton"
+                                        Grid.Column="2"
+                                        Content="Set Password"
+                                        Click="SetWebPasswordButton_Click"/>
+                            </Grid>
+
+                            <TextBlock x:Name="WebPasswordStatusText"
+                                       Text="Web password is not set."
+                                       FontSize="12"
+                                       Foreground="#B8B8B8"
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap"/>
+
+                            <TextBlock x:Name="WebServiceStatusText"
+                                       Text="Web service is stopped."
+                                       FontSize="12"
+                                       Foreground="#B8B8B8"
+                                       Margin="0,10,0,0"
+                                       TextWrapping="Wrap"/>
+
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Button x:Name="StartWebServiceButton"
+                                        Grid.Column="0"
+                                        Content="Start Service"
+                                        Click="StartWebService_Click"/>
+                                <Button x:Name="StopWebServiceButton"
+                                        Grid.Column="2"
+                                        Content="Stop Service"
+                                        Background="#A04040"
+                                        Click="StopWebService_Click"/>
+                                <Button x:Name="OpenWebPageButton"
+                                        Grid.Column="4"
+                                        Content="Open Web Page"
+                                        Background="#3E3E42"
+                                        Click="OpenWebPage_Click"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
 
                     <Border Background="#252526"
                             BorderBrush="#3E3E42"
@@ -322,7 +504,8 @@
                                          Grid.Column="1"
                                          Margin="8,0,8,0"
                                          HorizontalContentAlignment="Center"
-                                         Text="1"/>
+                                         Text="1"
+                                         LostFocus="MainSettingChanged_LostFocus"/>
                                 <TextBlock Grid.Column="2"
                                            Text="Default: 1"
                                            Foreground="#9D9D9D"
@@ -343,7 +526,8 @@
                                          Grid.Column="1"
                                          Margin="8,0,8,0"
                                          HorizontalContentAlignment="Center"
-                                         Text="0"/>
+                                         Text="0"
+                                         LostFocus="MainSettingChanged_LostFocus"/>
                                 <TextBlock Grid.Column="2"
                                            Text="Runs once; 0 = immediate"
                                            Foreground="#9D9D9D"
@@ -391,7 +575,17 @@
                                          Foreground="White"
                                          BorderBrush="#3E3E42"
                                          BorderThickness="1"
-                                         Margin="0,0,10,0"/>
+                                         Margin="0,0,10,0">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Content="{Binding Name}"
+                                                      IsChecked="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                      Foreground="White"
+                                                      Padding="4,2"
+                                                      Click="AppsListEntryCheckBox_Click"/>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
 
                                 <Button Content="Remove" Grid.Column="1" VerticalAlignment="Top" Click="RemoveLaunchWatchApp_Click"/>
                             </Grid>
@@ -449,7 +643,17 @@
                                          Foreground="White"
                                          BorderBrush="#3E3E42"
                                          BorderThickness="1"
-                                         Margin="0,0,10,0"/>
+                                         Margin="0,0,10,0">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Content="{Binding Name}"
+                                                      IsChecked="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                      Foreground="White"
+                                                      Padding="4,2"
+                                                      Click="AppsListEntryCheckBox_Click"/>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
 
                                 <Button Content="Remove" Grid.Column="1" VerticalAlignment="Top" Click="RemoveSelectedApp_Click"/>
                             </Grid>
@@ -466,11 +670,5 @@
                    Foreground="#666666"
                    HorizontalAlignment="Center"
                    Margin="0,14,0,10"/>
-
-        <Button Grid.Row="4"
-                Content="💾 Save Configuration"
-                Style="{StaticResource SaveButton}"
-                HorizontalAlignment="Stretch"
-                Click="SaveConfig_Click"/>
     </Grid>
 </Window>

@@ -14,6 +14,12 @@ A Windows desktop application for advanced system control via global hotkeys. Bu
   - Exact match only - won't trigger on partial combinations
 - **System Tray Integration**: Runs minimized to tray
 - **Modern GUI**: WPF interface with dark theme
+- **Pushover Notifications**:
+  - Notify when System Squire starts
+  - Notify when System Squire exits
+  - Notify when selected apps start and/or close
+  - Per-app event selection (start, close, or both)
+  - Notify on machine inactivity with configurable resend interval
 
 ## Requirements
 
@@ -91,6 +97,21 @@ For full system-wide hotkey detection (including in elevated applications):
 - Monitors turn off immediately
 - Move mouse or press any key to wake monitors
 
+### Pushover Notifications
+1. Click **Configure Pushover Notifications** in the main window.
+2. Enable notifications and enter your **App Token** and **User Key**.
+3. Choose global app events:
+  - System Squire start
+  - System Squire exit
+  - Inactivity (no user input)
+  - Set inactivity interval in minutes
+4. Add apps in **Apps To Watch For Start/Close**.
+5. For each app, choose **Start**, **Close**, or both.
+6. Save in the Pushover window, then save main configuration.
+
+The app monitors selected processes continuously while running and sends notifications according to each app's selected event toggles.
+When inactivity notifications are enabled, System Squire sends an alert after the configured idle interval and repeats at the same interval while the machine remains idle. Any user input resets the inactivity timer.
+
 ## Architecture
 
 ### Low-Level Keyboard Hook
@@ -118,8 +139,28 @@ Settings are stored in `config.json` in the application directory:
 {
   "ShutdownHotkey": "Ctrl+Alt+F8",
   "BlackoutHotkey": "Ctrl+Alt+F7",
-  "DarkMode": true,
-  "StartMinimized": true
+  "StartMinimized": true,
+  "Pushover": {
+    "Enabled": true,
+    "ApiToken": "your_app_token",
+    "UserKey": "your_user_key",
+    "NotifyOnSystemSquireStart": true,
+    "NotifyOnSystemSquireClose": true,
+    "NotifyOnInactivity": true,
+    "InactivityNotificationMinutes": 30,
+    "LifecycleAppEventEntries": [
+      {
+        "Name": "chrome",
+        "NotifyOnStart": true,
+        "NotifyOnClose": false
+      },
+      {
+        "Name": "discord",
+        "NotifyOnStart": true,
+        "NotifyOnClose": true
+      }
+    ]
+  }
 }
 ```
 

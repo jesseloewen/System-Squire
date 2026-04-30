@@ -3,6 +3,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>System Squire</AssemblyName>
     <ApplicationIcon>Assets\system-squire-icon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
