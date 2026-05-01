@@ -1062,44 +1062,64 @@ namespace SystemSquire
 
                         bool anyChanges = createdFiles.Count > 0 || removedFiles.Count > 0 || modifiedFiles.Count > 0;
 
-                        if (entry.NotifyOnCreated)
-                        {
-                            foreach (string filePath in createdFiles)
-                            {
-                                OnFolderWatchEventDetected(new FolderWatchEventArgs(
-                                    entry.FolderPath,
-                                    GetRelativePathSafe(entry.FolderPath, filePath),
-                                    FolderWatchEventType.Created,
-                                    TimeSpan.Zero));
-                            }
-                        }
-
-                        if (entry.NotifyOnRemoved)
-                        {
-                            foreach (string filePath in removedFiles)
-                            {
-                                OnFolderWatchEventDetected(new FolderWatchEventArgs(
-                                    entry.FolderPath,
-                                    GetRelativePathSafe(entry.FolderPath, filePath),
-                                    FolderWatchEventType.Removed,
-                                    TimeSpan.Zero));
-                            }
-                        }
-
-                        if (entry.NotifyOnModified)
-                        {
-                            foreach (string filePath in modifiedFiles)
-                            {
-                                OnFolderWatchEventDetected(new FolderWatchEventArgs(
-                                    entry.FolderPath,
-                                    GetRelativePathSafe(entry.FolderPath, filePath),
-                                    FolderWatchEventType.Modified,
-                                    TimeSpan.Zero));
-                            }
-                        }
+                        bool wasInactive = entry.NotifyOnInactivity && inactivityPeriodsByFolder[entry.FolderPath] > 0;
 
                         if (anyChanges)
                         {
+                            if (wasInactive)
+                            {
+                                string resumedPath = modifiedFiles.FirstOrDefault()
+                                    ?? createdFiles.FirstOrDefault()
+                                    ?? removedFiles.FirstOrDefault()
+                                    ?? string.Empty;
+
+                                OnFolderWatchEventDetected(new FolderWatchEventArgs(
+                                    entry.FolderPath,
+                                    string.IsNullOrWhiteSpace(resumedPath)
+                                        ? "Activity resumed"
+                                        : GetRelativePathSafe(entry.FolderPath, resumedPath),
+                                    FolderWatchEventType.Modified,
+                                    TimeSpan.Zero));
+                            }
+                            else
+                            {
+                                if (entry.NotifyOnCreated)
+                                {
+                                    foreach (string filePath in createdFiles)
+                                    {
+                                        OnFolderWatchEventDetected(new FolderWatchEventArgs(
+                                            entry.FolderPath,
+                                            GetRelativePathSafe(entry.FolderPath, filePath),
+                                            FolderWatchEventType.Created,
+                                            TimeSpan.Zero));
+                                    }
+                                }
+
+                                if (entry.NotifyOnRemoved)
+                                {
+                                    foreach (string filePath in removedFiles)
+                                    {
+                                        OnFolderWatchEventDetected(new FolderWatchEventArgs(
+                                            entry.FolderPath,
+                                            GetRelativePathSafe(entry.FolderPath, filePath),
+                                            FolderWatchEventType.Removed,
+                                            TimeSpan.Zero));
+                                    }
+                                }
+
+                                if (entry.NotifyOnModified)
+                                {
+                                    foreach (string filePath in modifiedFiles)
+                                    {
+                                        OnFolderWatchEventDetected(new FolderWatchEventArgs(
+                                            entry.FolderPath,
+                                            GetRelativePathSafe(entry.FolderPath, filePath),
+                                            FolderWatchEventType.Modified,
+                                            TimeSpan.Zero));
+                                    }
+                                }
+                            }
+
                             lastChangeUtcByFolder[entry.FolderPath] = nowUtc;
                             inactivityPeriodsByFolder[entry.FolderPath] = 0;
                         }

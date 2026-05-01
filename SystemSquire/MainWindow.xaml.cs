@@ -929,9 +929,6 @@ namespace SystemSquire
             return await InvokeOnUiThreadAsync(() => new RemoteControlState
             {
                 StatusText = _latestSystemStatus,
-                ShutdownHotkey = ShutdownHotkeyBox.Text,
-                BlackoutHotkey = BlackoutHotkeyBox.Text,
-                StartMinimized = StartMinimizedCheckBox.IsChecked == true,
                 LaunchWatchDurationMinutes = GetLaunchWatchDurationMinutes(),
                 LaunchMinimizeDelaySeconds = GetLaunchMinimizeDelaySeconds(),
                 AppsToKillBeforeShutdown = GetConfiguredAppEntries(AppsToKillListBox),
@@ -1035,17 +1032,6 @@ namespace SystemSquire
 
         private void ApplyRemoteConfigToUi(RemoteConfigUpdateRequest request)
         {
-            if (!string.IsNullOrWhiteSpace(request.ShutdownHotkey))
-            {
-                ShutdownHotkeyBox.Text = request.ShutdownHotkey.Trim();
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.BlackoutHotkey))
-            {
-                BlackoutHotkeyBox.Text = request.BlackoutHotkey.Trim();
-            }
-
-            StartMinimizedCheckBox.IsChecked = request.StartMinimized;
             LaunchWatchDurationBox.Text = Math.Max(1, request.LaunchWatchDurationMinutes).ToString();
             LaunchMinimizeDelayBox.Text = Math.Max(0, request.LaunchMinimizeDelaySeconds).ToString();
 

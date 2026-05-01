@@ -1420,17 +1420,6 @@ namespace SystemSquire
             <details class="group" open>
                 <summary>Main System Controls</summary>
                 <div class="group-body">
-                    <label for="shutdownHotkey">Shutdown Hotkey</label>
-                    <input id="shutdownHotkey" type="text" />
-
-                    <label for="blackoutHotkey">Blackout Hotkey</label>
-                    <input id="blackoutHotkey" type="text" />
-
-                    <div class="check">
-                        <input id="startMinimized" type="checkbox" />
-                        <span>Start Minimized to Tray</span>
-                    </div>
-
                     <div class="inline">
                         <div>
                             <label for="watchDuration">Watch Duration (minutes)</label>
@@ -2036,9 +2025,6 @@ namespace SystemSquire
 
         function collectConfigPayload() {
             return {
-                shutdownHotkey: document.getElementById("shutdownHotkey").value,
-                blackoutHotkey: document.getElementById("blackoutHotkey").value,
-                startMinimized: document.getElementById("startMinimized").checked,
                 launchWatchDurationMinutes: Number(document.getElementById("watchDuration").value || 1),
                 launchMinimizeDelaySeconds: Number(document.getElementById("minimizeDelay").value || 0),
                 appsToKillBeforeShutdown: collectEntries("killAppsList"),
@@ -2096,9 +2082,6 @@ namespace SystemSquire
 
         function attachAutoSaveHandlers() {
             const controlIds = [
-                "shutdownHotkey",
-                "blackoutHotkey",
-                "startMinimized",
                 "watchDuration",
                 "minimizeDelay",
                 "pushoverEnabled",
@@ -2130,9 +2113,6 @@ namespace SystemSquire
             lastStateFingerprint = getStateFingerprint(state);
             document.getElementById("statusText").textContent = `Status: ${state.statusText} | Service port: ${state.webServicePort}`;
 
-            document.getElementById("shutdownHotkey").value = state.shutdownHotkey || "";
-            document.getElementById("blackoutHotkey").value = state.blackoutHotkey || "";
-            document.getElementById("startMinimized").checked = !!state.startMinimized;
             document.getElementById("watchDuration").value = state.launchWatchDurationMinutes || 1;
             document.getElementById("minimizeDelay").value = state.launchMinimizeDelaySeconds || 0;
 

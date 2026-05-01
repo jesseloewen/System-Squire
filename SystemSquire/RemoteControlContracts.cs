@@ -5,9 +5,6 @@ namespace SystemSquire
     public sealed class RemoteControlState
     {
         public string StatusText { get; set; } = "Ready";
-        public string ShutdownHotkey { get; set; } = "Ctrl+Alt+F8";
-        public string BlackoutHotkey { get; set; } = "Ctrl+Alt+F7";
-        public bool StartMinimized { get; set; } = true;
         public int LaunchWatchDurationMinutes { get; set; } = 1;
         public int LaunchMinimizeDelaySeconds { get; set; } = 0;
         public List<ConfiguredAppEntry> AppsToKillBeforeShutdown { get; set; } = new();
@@ -20,9 +17,6 @@ namespace SystemSquire
 
     public sealed class RemoteConfigUpdateRequest
     {
-        public string? ShutdownHotkey { get; set; }
-        public string? BlackoutHotkey { get; set; }
-        public bool StartMinimized { get; set; } = true;
         public int LaunchWatchDurationMinutes { get; set; } = 1;
         public int LaunchMinimizeDelaySeconds { get; set; }
         public List<ConfiguredAppEntry> AppsToKillBeforeShutdown { get; set; } = new();
