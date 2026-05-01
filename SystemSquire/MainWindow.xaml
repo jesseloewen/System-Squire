@@ -319,10 +319,24 @@
                               IsChecked="True"
                               Click="MainSettingChanged_Click"/>
 
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
                         <Button x:Name="ConfigurePushoverButton"
-                            Content="Configure Pushover Notifications"
-                            Margin="0,12,0,0"
-                            Click="ConfigurePushover_Click"/>
+                                Grid.Column="0"
+                                Content="Configure Pushover Notifications"
+                                Click="ConfigurePushover_Click"/>
+
+                        <Button x:Name="TestPushoverNotificationButton"
+                                Grid.Column="2"
+                                Content="Send Test Notification"
+                                Background="#2E7D32"
+                                Click="TestPushoverNotification_Click"/>
+                    </Grid>
 
                     <Border Background="#252526"
                             BorderBrush="#3E3E42"
@@ -568,24 +582,67 @@
                                     <ColumnDefinition Width="110"/>
                                 </Grid.ColumnDefinitions>
 
-                                <ListBox x:Name="AppsToWatchAtLaunchListBox"
-                                         Grid.Column="0"
-                                         Height="170"
-                                         Background="#1E1E1E"
-                                         Foreground="White"
-                                         BorderBrush="#3E3E42"
-                                         BorderThickness="1"
-                                         Margin="0,0,10,0">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <CheckBox Content="{Binding Name}"
-                                                      IsChecked="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                      Foreground="White"
-                                                      Padding="4,2"
-                                                      Click="AppsListEntryCheckBox_Click"/>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
+                                <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                    <Border Background="#252526"
+                                            BorderBrush="#3E3E42"
+                                            BorderThickness="1,1,1,0"
+                                            CornerRadius="4,4,0,0"
+                                            Padding="8,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="70"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Grid.Column="0"
+                                                       Text="On"
+                                                       Foreground="#B8B8B8"
+                                                       FontSize="12"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="Application"
+                                                       Foreground="#B8B8B8"
+                                                       FontSize="12"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <ListBox x:Name="AppsToWatchAtLaunchListBox"
+                                             Height="146"
+                                             Background="#1E1E1E"
+                                             Foreground="White"
+                                             BorderBrush="#3E3E42"
+                                             BorderThickness="1"
+                                             Margin="0"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="70"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <CheckBox Grid.Column="0"
+                                                              IsChecked="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                              Foreground="White"
+                                                              HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"
+                                                              Click="AppsListEntryCheckBox_Click"/>
+
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Name}"
+                                                               Foreground="White"
+                                                               VerticalAlignment="Center"
+                                                               Padding="4,2"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
 
                                 <Button Content="Remove" Grid.Column="1" VerticalAlignment="Top" Click="RemoveLaunchWatchApp_Click"/>
                             </Grid>
@@ -636,24 +693,67 @@
                                     <ColumnDefinition Width="110"/>
                                 </Grid.ColumnDefinitions>
 
-                                <ListBox x:Name="AppsToKillListBox"
-                                         Grid.Column="0"
-                                         Height="170"
-                                         Background="#1E1E1E"
-                                         Foreground="White"
-                                         BorderBrush="#3E3E42"
-                                         BorderThickness="1"
-                                         Margin="0,0,10,0">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <CheckBox Content="{Binding Name}"
-                                                      IsChecked="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                      Foreground="White"
-                                                      Padding="4,2"
-                                                      Click="AppsListEntryCheckBox_Click"/>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
+                                <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                    <Border Background="#252526"
+                                            BorderBrush="#3E3E42"
+                                            BorderThickness="1,1,1,0"
+                                            CornerRadius="4,4,0,0"
+                                            Padding="8,4">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="70"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBlock Grid.Column="0"
+                                                       Text="On"
+                                                       Foreground="#B8B8B8"
+                                                       FontSize="12"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="Application"
+                                                       Foreground="#B8B8B8"
+                                                       FontSize="12"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Border>
+
+                                    <ListBox x:Name="AppsToKillListBox"
+                                             Height="146"
+                                             Background="#1E1E1E"
+                                             Foreground="White"
+                                             BorderBrush="#3E3E42"
+                                             BorderThickness="1"
+                                             Margin="0"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="70"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <CheckBox Grid.Column="0"
+                                                              IsChecked="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                              Foreground="White"
+                                                              HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"
+                                                              Click="AppsListEntryCheckBox_Click"/>
+
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{Binding Name}"
+                                                               Foreground="White"
+                                                               VerticalAlignment="Center"
+                                                               Padding="4,2"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </StackPanel>
 
                                 <Button Content="Remove" Grid.Column="1" VerticalAlignment="Top" Click="RemoveSelectedApp_Click"/>
                             </Grid>

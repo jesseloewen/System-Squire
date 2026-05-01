@@ -42,6 +42,7 @@ namespace SystemSquire
                 TriggerShutdownFromRemoteAsync,
                 TriggerBlackoutFromRemoteAsync,
                 TriggerLockDesktopFromRemoteAsync,
+                TriggerPushoverTestFromRemoteAsync,
                 SaveRemoteConfigAsync,
                 GetRemoteWebAuthSettings,
                 VerifyRemoteWebPassword);
@@ -329,6 +330,17 @@ namespace SystemSquire
             _pushoverConfigWindow.ConfigChanged += PushoverConfigWindow_ConfigChanged;
             _pushoverConfigWindow.Closed += PushoverConfigWindow_Closed;
             _pushoverConfigWindow.ShowDialog();
+        }
+
+        private async void TestPushoverNotification_Click(object sender, RoutedEventArgs e)
+        {
+            (bool success, string message) = await SendTestPushoverNotificationAsync();
+
+            MessageBox.Show(
+                message,
+                "System Squire",
+                MessageBoxButton.OK,
+                success ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
         private void PushoverConfigWindow_Closed(object? sender, EventArgs e)
@@ -925,7 +937,7 @@ namespace SystemSquire
                 AppsToKillBeforeShutdown = GetConfiguredAppEntries(AppsToKillListBox),
                 AppsToWatchAfterLaunch = GetConfiguredAppEntries(AppsToWatchAtLaunchListBox),
                 RunningApplications = GetRunningApplications(),
-                Pushover = ClonePushoverConfig(_configManager.Config.Pushover),
+                Pushover = ClonePushoverConfigForRemote(_configManager.Config.Pushover),
                 WebServiceRunning = _remoteWebService.IsRunning,
                 WebServicePort = _remoteWebService.Port > 0
                     ? _remoteWebService.Port
@@ -991,6 +1003,18 @@ namespace SystemSquire
             };
         }
 
+        private async Task<RemoteOperationResponse> TriggerPushoverTestFromRemoteAsync()
+        {
+            (bool success, string message) = await SendTestPushoverNotificationAsync();
+
+            return new RemoteOperationResponse
+            {
+                Success = success,
+                Message = message,
+                State = await GetRemoteControlStateAsync()
+            };
+        }
+
         private async Task<RemoteOperationResponse> SaveRemoteConfigAsync(RemoteConfigUpdateRequest request)
         {
             await InvokeOnUiThreadAsync(() =>
@@ -1041,7 +1065,15 @@ namespace SystemSquire
                 return;
             }
 
-            _configManager.Config.Pushover = ClonePushoverConfig(requestPushover);
+            string existingApiToken = _configManager.Config.Pushover?.ApiToken ?? string.Empty;
+            string existingUserKey = _configManager.Config.Pushover?.UserKey ?? string.Empty;
+
+            PushoverConfig updatedConfig = ClonePushoverConfig(requestPushover);
+            updatedConfig.ApiToken = existingApiToken;
+            updatedConfig.UserKey = existingUserKey;
+            updatedConfig.Normalize();
+
+            _configManager.Config.Pushover = updatedConfig;
         }
 
         private void SyncOpenPushoverConfigWindow()
@@ -1106,6 +1138,14 @@ namespace SystemSquire
             };
 
             clone.Normalize();
+            return clone;
+        }
+
+        private static PushoverConfig ClonePushoverConfigForRemote(PushoverConfig? source)
+        {
+            PushoverConfig clone = ClonePushoverConfig(source);
+            clone.ApiToken = string.Empty;
+            clone.UserKey = string.Empty;
             return clone;
         }
 
@@ -1344,15 +1384,40 @@ namespace SystemSquire
             await SendPushoverNotificationAsync("System Squire", "System Squire is closing.");
         }
 
-        private async Task SendPushoverNotificationAsync(string title, string message)
+        private async Task<(bool Success, string Message)> SendTestPushoverNotificationAsync()
+        {
+            PushoverConfig pushover = await InvokeOnUiThreadAsync(() =>
+                ClonePushoverConfig(_configManager.Config.Pushover));
+
+            if (!pushover.Enabled)
+            {
+                return (false, "Pushover notifications are disabled. Enable them in Pushover settings.");
+            }
+
+            if (string.IsNullOrWhiteSpace(pushover.ApiToken) || string.IsNullOrWhiteSpace(pushover.UserKey))
+            {
+                return (false, "Pushover App Token and User Key must be configured from the desktop UI.");
+            }
+
+            bool sent = await _pushoverService.SendAsync(
+                pushover,
+                "System Squire",
+                "Test notification from System Squire.");
+
+            return sent
+                ? (true, "Test notification sent.")
+                : (false, "Failed to send test notification. Verify your credentials and internet connection.");
+        }
+
+        private async Task<bool> SendPushoverNotificationAsync(string title, string message)
         {
             PushoverConfig? pushover = _configManager.Config.Pushover;
             if (!_pushoverService.IsReady(pushover))
             {
-                return;
+                return false;
             }
 
-            await _pushoverService.SendAsync(pushover, title, message);
+            return await _pushoverService.SendAsync(pushover, title, message);
         }
     }
 }

@@ -27,6 +27,7 @@ namespace SystemSquire
         private readonly Func<Task<RemoteOperationResponse>> _triggerShutdownAsync;
         private readonly Func<Task<RemoteOperationResponse>> _triggerBlackoutAsync;
         private readonly Func<Task<RemoteOperationResponse>> _triggerLockDesktopAsync;
+        private readonly Func<Task<RemoteOperationResponse>> _triggerPushoverTestAsync;
         private readonly Func<RemoteConfigUpdateRequest, Task<RemoteOperationResponse>> _saveConfigAsync;
         private readonly Func<RemoteWebAuthSettings> _getWebAuthSettings;
         private readonly Func<string, bool> _verifyWebPassword;
@@ -62,6 +63,7 @@ namespace SystemSquire
             Func<Task<RemoteOperationResponse>> triggerShutdownAsync,
             Func<Task<RemoteOperationResponse>> triggerBlackoutAsync,
             Func<Task<RemoteOperationResponse>> triggerLockDesktopAsync,
+            Func<Task<RemoteOperationResponse>> triggerPushoverTestAsync,
             Func<RemoteConfigUpdateRequest, Task<RemoteOperationResponse>> saveConfigAsync,
             Func<RemoteWebAuthSettings> getWebAuthSettings,
             Func<string, bool> verifyWebPassword)
@@ -70,6 +72,7 @@ namespace SystemSquire
             _triggerShutdownAsync = triggerShutdownAsync;
             _triggerBlackoutAsync = triggerBlackoutAsync;
             _triggerLockDesktopAsync = triggerLockDesktopAsync;
+            _triggerPushoverTestAsync = triggerPushoverTestAsync;
             _saveConfigAsync = saveConfigAsync;
             _getWebAuthSettings = getWebAuthSettings;
             _verifyWebPassword = verifyWebPassword;
@@ -705,6 +708,13 @@ namespace SystemSquire
                     return;
                 }
 
+                if (method == "POST" && path.Equals("/api/action/pushover-test", StringComparison.OrdinalIgnoreCase))
+                {
+                    RemoteOperationResponse response = await _triggerPushoverTestAsync().ConfigureAwait(false);
+                    await WriteJsonAsync(context, response.Success ? 200 : 400, response).ConfigureAwait(false);
+                    return;
+                }
+
                 if (method == "POST" && path.Equals("/api/config/save", StringComparison.OrdinalIgnoreCase))
                 {
                     RemoteConfigUpdateRequest? request = await ReadJsonRequestAsync<RemoteConfigUpdateRequest>(context.Request)
@@ -1288,20 +1298,78 @@ namespace SystemSquire
             margin-top: 10px;
             border: 1px solid var(--border);
             border-radius: 10px;
-            padding: 8px;
+            padding: 0;
             min-height: 110px;
             max-height: 220px;
             overflow: auto;
             background: #0f141b;
         }
 
-        .entry {
+        .list-header {
             display: grid;
-            grid-template-columns: 24px 1fr auto;
             align-items: center;
             gap: 8px;
-            padding: 6px;
+            padding: 8px;
+            color: #8b96a8;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            background: #151c27;
             border-bottom: 1px solid #232a36;
+            width: max-content;
+            min-width: 100%;
+        }
+
+        .list-header.default {
+            grid-template-columns: 64px minmax(180px, 1fr) 96px;
+        }
+
+        .list-header.lifecycle {
+            grid-template-columns: minmax(180px, 1fr) 80px 80px 96px;
+        }
+
+        .list-header.folder {
+            grid-template-columns: minmax(220px, 1fr) 56px 56px 56px 56px 96px;
+        }
+
+        .list-header .center {
+            text-align: center;
+        }
+
+        .list-header .right {
+            text-align: right;
+        }
+
+        .empty-row {
+            color: #8b96a8;
+            padding: 8px;
+        }
+
+        .entry {
+            display: grid;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            border-bottom: 1px solid #232a36;
+            width: max-content;
+            min-width: 100%;
+        }
+
+        .entry.default {
+            grid-template-columns: 64px minmax(180px, 1fr) 96px;
+        }
+
+        .entry.lifecycle {
+            grid-template-columns: minmax(180px, 1fr) 80px 80px 96px;
+        }
+
+        .entry.folder {
+            grid-template-columns: minmax(220px, 1fr) 56px 56px 56px 56px 96px;
+        }
+
+        .entry.default input[type="checkbox"] {
+            justify-self: center;
         }
 
         .entry:last-child { border-bottom: none; }
@@ -1343,6 +1411,7 @@ namespace SystemSquire
                 <button id="shutdownBtn" class="danger">Toggle Shutdown</button>
                 <button id="blackoutBtn" class="secondary">Trigger Blackout</button>
                 <button id="lockDesktopBtn" class="secondary">Lock Desktop</button>
+                <button id="testPushoverBtn" class="success">Test Notification</button>
             </div>
             <div id="messageBanner" class="banner"></div>
         </section>
@@ -1407,18 +1476,12 @@ namespace SystemSquire
             <details class="group" open>
                 <summary>Pushover Core Settings</summary>
                 <div class="group-body">
-                    <h2>Pushover Credentials and Events</h2>
+                    <h2>Pushover Notification Events</h2>
 
                     <div class="check">
                         <input id="pushoverEnabled" type="checkbox" />
                         <span>Enable Pushover notifications</span>
                     </div>
-
-                    <label for="pushoverApiToken">API Token</label>
-                    <input id="pushoverApiToken" type="text" />
-
-                    <label for="pushoverUserKey">User Key</label>
-                    <input id="pushoverUserKey" type="text" />
 
                     <div class="check">
                         <input id="notifyOnSystemSquireStart" type="checkbox" />
@@ -1563,18 +1626,37 @@ namespace SystemSquire
             banner.className = "banner";
         }
 
+        function appendListHeader(container, type) {
+            const header = document.createElement("div");
+            header.className = `list-header ${type}`;
+
+            if (type === "default") {
+                header.innerHTML = "<span>On</span><span>Application</span><span class=\"right\">Action</span>";
+            } else if (type === "lifecycle") {
+                header.innerHTML = "<span>Application</span><span class=\"center\">Start</span><span class=\"center\">Close</span><span class=\"right\">Action</span>";
+            } else if (type === "folder") {
+                header.innerHTML = "<span>Folder Path</span><span class=\"center\">New</span><span class=\"center\">Del</span><span class=\"center\">Mod</span><span class=\"center\">Idle</span><span class=\"right\">Action</span>";
+            }
+
+            container.appendChild(header);
+        }
+
         function renderAppList(containerId, entries) {
             const container = document.getElementById(containerId);
             container.innerHTML = "";
+            appendListHeader(container, "default");
 
             if (!entries || entries.length === 0) {
-                container.innerHTML = `<div style="color:#8b96a8;padding:6px;">No apps configured.</div>`;
+                const empty = document.createElement("div");
+                empty.className = "empty-row";
+                empty.textContent = "No apps configured.";
+                container.appendChild(empty);
                 return;
             }
 
             entries.forEach((entry) => {
                 const row = document.createElement("div");
-                row.className = "entry";
+                row.className = "entry default";
                 row.dataset.name = entry.name;
 
                 const enabled = document.createElement("input");
@@ -1602,17 +1684,20 @@ namespace SystemSquire
         function renderLifecyclePushoverList(entries) {
             const container = document.getElementById("pushoverAppsList");
             container.innerHTML = "";
+            appendListHeader(container, "lifecycle");
 
             if (!entries || entries.length === 0) {
-                container.innerHTML = `<div style="color:#8b96a8;padding:6px;">No app lifecycle rules configured.</div>`;
+                const empty = document.createElement("div");
+                empty.className = "empty-row";
+                empty.textContent = "No app lifecycle rules configured.";
+                container.appendChild(empty);
                 return;
             }
 
             entries.forEach((entry) => {
                 const row = document.createElement("div");
-                row.className = "entry";
+                row.className = "entry lifecycle";
                 row.dataset.name = entry.name;
-                row.style.gridTemplateColumns = "1fr 80px 80px auto";
 
                 const name = document.createElement("div");
                 name.textContent = entry.name;
@@ -1647,17 +1732,20 @@ namespace SystemSquire
         function renderFolderWatchList(entries) {
             const container = document.getElementById("folderWatchList");
             container.innerHTML = "";
+            appendListHeader(container, "folder");
 
             if (!entries || entries.length === 0) {
-                container.innerHTML = `<div style="color:#8b96a8;padding:6px;">No folder watch rules configured.</div>`;
+                const empty = document.createElement("div");
+                empty.className = "empty-row";
+                empty.textContent = "No folder watch rules configured.";
+                container.appendChild(empty);
                 return;
             }
 
             entries.forEach((entry) => {
                 const row = document.createElement("div");
-                row.className = "entry";
+                row.className = "entry folder";
                 row.dataset.folderPath = entry.folderPath;
-                row.style.gridTemplateColumns = "1fr 48px 48px 48px 48px auto";
 
                 const path = document.createElement("div");
                 path.textContent = entry.folderPath;
@@ -1804,7 +1892,7 @@ namespace SystemSquire
             }
 
             const row = document.createElement("div");
-            row.className = "entry";
+            row.className = "entry default";
             row.dataset.name = appName;
 
             const enabled = document.createElement("input");
@@ -1826,9 +1914,7 @@ namespace SystemSquire
             row.appendChild(name);
             row.appendChild(remove);
 
-            if (list.textContent.includes("No apps configured")) {
-                list.innerHTML = "";
-            }
+            list.querySelector(".empty-row")?.remove();
 
             list.appendChild(row);
             scheduleSaveConfig();
@@ -1850,9 +1936,8 @@ namespace SystemSquire
             }
 
             const row = document.createElement("div");
-            row.className = "entry";
+            row.className = "entry lifecycle";
             row.dataset.name = appName;
-            row.style.gridTemplateColumns = "1fr 80px 80px auto";
 
             const name = document.createElement("div");
             name.textContent = appName;
@@ -1879,9 +1964,7 @@ namespace SystemSquire
             row.appendChild(notifyClose);
             row.appendChild(remove);
 
-            if (list.textContent.includes("No app lifecycle rules configured")) {
-                list.innerHTML = "";
-            }
+            list.querySelector(".empty-row")?.remove();
 
             list.appendChild(row);
             scheduleSaveConfig();
@@ -1903,9 +1986,8 @@ namespace SystemSquire
             }
 
             const row = document.createElement("div");
-            row.className = "entry";
+            row.className = "entry folder";
             row.dataset.folderPath = folderPath;
-            row.style.gridTemplateColumns = "1fr 48px 48px 48px 48px auto";
 
             const path = document.createElement("div");
             path.textContent = folderPath;
@@ -1945,9 +2027,7 @@ namespace SystemSquire
             row.appendChild(inactivity);
             row.appendChild(remove);
 
-            if (list.textContent.includes("No folder watch rules configured")) {
-                list.innerHTML = "";
-            }
+            list.querySelector(".empty-row")?.remove();
 
             list.appendChild(row);
             input.value = "";
@@ -1965,8 +2045,6 @@ namespace SystemSquire
                 appsToWatchAfterLaunch: collectEntries("watchAppsList"),
                 pushover: {
                     enabled: document.getElementById("pushoverEnabled").checked,
-                    apiToken: document.getElementById("pushoverApiToken").value,
-                    userKey: document.getElementById("pushoverUserKey").value,
                     notifyOnSystemSquireStart: document.getElementById("notifyOnSystemSquireStart").checked,
                     notifyOnSystemSquireClose: document.getElementById("notifyOnSystemSquireClose").checked,
                     notifyOnInactivity: document.getElementById("notifyOnInactivity").checked,
@@ -2024,8 +2102,6 @@ namespace SystemSquire
                 "watchDuration",
                 "minimizeDelay",
                 "pushoverEnabled",
-                "pushoverApiToken",
-                "pushoverUserKey",
                 "notifyOnSystemSquireStart",
                 "notifyOnSystemSquireClose",
                 "notifyOnInactivity",
@@ -2062,8 +2138,6 @@ namespace SystemSquire
 
             const pushover = state.pushover || {};
             document.getElementById("pushoverEnabled").checked = !!pushover.enabled;
-            document.getElementById("pushoverApiToken").value = pushover.apiToken || "";
-            document.getElementById("pushoverUserKey").value = pushover.userKey || "";
             document.getElementById("notifyOnSystemSquireStart").checked = !!pushover.notifyOnSystemSquireStart;
             document.getElementById("notifyOnSystemSquireClose").checked = !!pushover.notifyOnSystemSquireClose;
             document.getElementById("notifyOnInactivity").checked = !!pushover.notifyOnInactivity;
@@ -2163,6 +2237,10 @@ namespace SystemSquire
 
         document.getElementById("lockDesktopBtn").addEventListener("click", () => {
             runAction("/api/action/lock-desktop", {}, "Desktop locked.");
+        });
+
+        document.getElementById("testPushoverBtn").addEventListener("click", () => {
+            runAction("/api/action/pushover-test", {}, "Test notification sent.");
         });
 
         document.getElementById("addKillAppBtn").addEventListener("click", () => addSelectedApp("runningAppsKill", "killAppsList"));
