@@ -4,8 +4,7 @@ param(
     [string]$RuntimeIdentifier = "win-x64",
     [switch]$FrameworkDependent,
     [switch]$BuildInstaller,
-    [string]$InstallerVersion,
-    [switch]$NoRun
+    [string]$InstallerVersion
 )
 
 Set-StrictMode -Version Latest
@@ -14,9 +13,6 @@ $ErrorActionPreference = "Stop"
 $projectRoot = $PSScriptRoot
 $solutionPath = Join-Path $projectRoot "SystemSquire.sln"
 $projectPath = Join-Path $projectRoot "SystemSquire\SystemSquire.csproj"
-$distPath = Join-Path $projectRoot "dist"
-$exeName = "System Squire.exe"
-$distExePath = Join-Path $distPath $exeName
 $installerScriptPath = Join-Path $projectRoot "installer\SystemSquire.iss"
 $installerOutputPath = Join-Path $projectRoot "installer\output"
 $selfContained = -not $FrameworkDependent
@@ -121,6 +117,26 @@ function Get-ResolvedInstallerVersion {
     return "1.1.0"
 }
 
+function Get-ResolvedTargetFramework {
+    param([string]$ProjectFilePath)
+
+    try {
+        [xml]$projectXml = Get-Content -Path $ProjectFilePath -Raw
+        $targetFrameworkNode = $projectXml.SelectSingleNode("/*[local-name()='Project']/*[local-name()='PropertyGroup']/*[local-name()='TargetFramework']")
+        if ($null -ne $targetFrameworkNode) {
+            $targetFramework = $targetFrameworkNode.InnerText.Trim()
+            if (-not [string]::IsNullOrWhiteSpace($targetFramework)) {
+                return $targetFramework
+            }
+        }
+    }
+    catch {
+        Write-Host "Could not parse target framework metadata. Using fallback net8.0-windows." -ForegroundColor Yellow
+    }
+
+    return "net8.0-windows"
+}
+
 if (-not (Test-Path $solutionPath)) {
     throw "Solution not found at $solutionPath"
 }
@@ -137,6 +153,15 @@ try {
     Write-Step "Pre-build checks"
     Ensure-AppNotRunning
 
+    $projectDirectory = Split-Path -Path $projectPath -Parent
+    $targetFramework = Get-ResolvedTargetFramework -ProjectFilePath $projectPath
+    $publishPath = Join-Path (Join-Path (Join-Path $projectDirectory "bin") $Configuration) $targetFramework
+    if (-not [string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
+        $publishPath = Join-Path $publishPath $RuntimeIdentifier
+    }
+
+    $publishPath = Join-Path $publishPath "publish"
+
     $restoreArgs = @($solutionPath)
     if (-not [string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
         $restoreArgs += @("--runtime", $RuntimeIdentifier)
@@ -145,17 +170,14 @@ try {
     Write-Step "Restore"
     Invoke-Dotnet -Command "restore" -Arguments $restoreArgs
 
-    Write-Step "Package"
-    if (Test-Path $distPath) {
-        Remove-Item $distPath -Recurse -Force
+    Write-Step "Prepare publish output"
+    if (Test-Path $publishPath) {
+        Remove-Item $publishPath -Recurse -Force
     }
-
-    New-Item -ItemType Directory -Path $distPath -Force | Out-Null
 
     $publishArgs = @(
         $projectPath,
         "--configuration", $Configuration,
-        "--output", $distPath,
         "--no-restore"
     )
 
@@ -174,7 +196,7 @@ try {
     Write-Step "Publish ($Configuration, $RuntimeIdentifier, $publishMode)"
     Invoke-Dotnet -Command "publish" -Arguments $publishArgs
 
-    Write-Host "Publish complete. Output folder: $distPath" -ForegroundColor Green
+    Write-Host "Publish complete. Output folder: $publishPath" -ForegroundColor Green
 
     if ($BuildInstaller) {
         if (-not (Test-Path $installerScriptPath)) {
@@ -191,25 +213,16 @@ try {
         Write-Step "Build installer (Inno Setup, version $resolvedVersion)"
         New-Item -ItemType Directory -Path $installerOutputPath -Force | Out-Null
 
-        & $isccPath "/DAppVersion=$resolvedVersion" "/DSourceDir=$distPath" "/DOutputDir=$installerOutputPath" $installerScriptPath
+        & $isccPath "/DAppVersion=$resolvedVersion" "/DSourceDir=$publishPath" "/DOutputDir=$installerOutputPath" $installerScriptPath
         if ($LASTEXITCODE -ne 0) {
             throw "Installer build failed with exit code $LASTEXITCODE"
         }
 
-        $installerExeName = "SystemSquireSetup-$resolvedVersion.exe"
+        $installerExeName = "SystemSquireSetup.exe"
         $installerExePath = Join-Path $installerOutputPath $installerExeName
         Write-Host "Installer complete. Output file: $installerExePath" -ForegroundColor Green
     }
 
-    if (-not $NoRun) {
-        if (-not (Test-Path $distExePath)) {
-            throw "Built executable not found at $distExePath"
-        }
-
-        Write-Step "Run"
-        Start-Process -FilePath $distExePath -WorkingDirectory $distPath
-        Write-Host "Launched $exeName" -ForegroundColor Green
-    }
 }
 catch {
     Write-Host "Build failed: $($_.Exception.Message)" -ForegroundColor Red

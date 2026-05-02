@@ -1,49 +1,61 @@
 # System Squire
 
-A Windows desktop utility for system control through global hotkeys, built with C# and WPF.
+System Squire is a Windows desktop utility for fast, keyboard-driven system control.
 
-Latest release download:
-- [Download System Squire (latest)](https://github.com/jesseloewen/System-Squire/releases/latest/download/SystemSquireSetup-1.1.0.exe)
+## Download
 
-Creator website:
-- I also build electronics and gaming tools at [jesseloewen.com](https://jesseloewen.com).
+Install the latest official release here:
+
+- **[Download SystemSquireSetup.exe](https://github.com/jesseloewen/System-Squire/releases/latest/download/SystemSquireSetup.exe)**
+
+You can also browse all releases:
+
+- [GitHub Releases](https://github.com/jesseloewen/System-Squire/releases)
 
 ## Features
 
-- Smart shutdown with a 10-second countdown
-- Cancel shutdown by pressing the shutdown hotkey again
-- 5-second cooldown after a cancellation
-- Instant monitor blackout hotkey
-- Custom global hotkeys with exact-match detection
-- System tray support and start-minimized behavior
-- Pushover notifications for:
-  - App start and close events
-  - System Squire start and exit
-  - Machine inactivity with configurable resend interval
+- Configurable global hotkeys for shutdown and monitor blackout actions
+- Smart shutdown flow with countdown, cancellation, and cooldown protection
+- System tray support with start-minimized behavior
+- Optional Pushover notifications for app and system activity
+- Per-app notification controls for start and close events
 
 Default hotkeys:
+
 - Shutdown: `Ctrl+Alt+F8`
 - Blackout: `Ctrl+Alt+F7`
 
 ## Requirements
 
-- Windows 10 or 11
+- Windows 10 or Windows 11
 
-## Quick Start
+## Installation
 
-1. Download the latest release zip from the link above.
-2. Extract the zip.
-3. Run `System Squire.exe` from the extracted folder.
+1. Download **SystemSquireSetup.exe** from the link above.
+2. Run the installer.
+3. Launch System Squire from the Start menu.
 
-For best global hotkey reliability (including elevated apps), run as Administrator.
+For best global hotkey reliability, run as Administrator.
+
+## Configuration
+
+System Squire stores settings in a local `config.json` file in the application directory.
+
+To enable Pushover notifications:
+
+1. Open **Configure Pushover Notifications**.
+2. Enable notifications and enter your App Token and User Key.
+3. Choose the events you want to receive.
+4. Save your settings.
 
 ## Build From Source
 
 Prerequisites:
-- Visual Studio 2022+ or .NET 8 SDK
-- Inno Setup 6 (only required when building the installer `.exe`)
 
-Build and publish:
+- Visual Studio 2022 or newer, or .NET 8 SDK
+- Inno Setup 6 (only needed to build the installer)
+
+Build:
 
 ```powershell
 .\build.ps1
@@ -55,49 +67,10 @@ Or:
 build.bat
 ```
 
-Optional script flags:
-
-```powershell
-.\build.ps1 -NoRun
-.\build.ps1 -Configuration Debug
-.\build.ps1 -RuntimeIdentifier win-arm64
-.\build.ps1 -FrameworkDependent
-.\build.ps1 -BuildInstaller -NoRun
-.\build.ps1 -BuildInstaller -InstallerVersion 1.2.3 -NoRun
-```
-
-Output:
-- `dist\System Squire.exe`
-- `installer\output\SystemSquireSetup-<version>.exe` (when `-BuildInstaller` is used)
-
-If `ISCC.exe` is not on `PATH`, set an environment variable before building:
-
-```powershell
-$env:INNO_SETUP_COMPILER = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-```
-
-## Configuration
-
-Settings are stored in `config.json` in the application directory.
-
-Pushover setup:
-1. Open **Configure Pushover Notifications** in the main window.
-2. Enable notifications and enter your App Token and User Key.
-3. Choose which global events to notify on.
-4. Add app names and select start/close events per app.
-5. Save in both windows.
-
-## Technical Notes
-
-- Uses a low-level keyboard hook (`WH_KEYBOARD_LL`) for precise global hotkey matching.
-- Hotkeys trigger only on exact combinations (required modifiers + key, no extra modifiers).
-- Bundles `minimize-to-tray.exe` from https://github.com/danielgjackson/minimize-to-tray/ and copies it during build/publish.
-
 ## Troubleshooting
 
-- Hotkeys not working everywhere: run as Administrator.
-- Blackout not working: some display/driver combinations ignore monitor power messages.
-- App will not start: ensure all files from `dist` remain together.
+- Hotkeys not working in all apps: run System Squire as Administrator.
+- Blackout not working on a display: some monitor and driver combinations may not support this behavior.
 
 ## License
 

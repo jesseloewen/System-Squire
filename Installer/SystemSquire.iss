@@ -8,7 +8,7 @@
 #endif
 
 #ifndef SourceDir
-  #define SourceDir "..\\dist"
+  #define SourceDir "..\\SystemSquire\\bin\\Release\\net8.0-windows\\win-x64\\publish"
 #endif
 
 #ifndef OutputDir
@@ -28,7 +28,7 @@ DefaultGroupName=System Squire
 DisableProgramGroupPage=yes
 DisableDirPage=no
 OutputDir={#OutputDir}
-OutputBaseFilename=SystemSquireSetup-{#AppVersion}
+OutputBaseFilename=SystemSquireSetup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -53,3 +53,27 @@ Name: "{autodesktop}\\System Squire"; Filename: "{app}\\{#MyAppExeName}"; Tasks:
 
 [Run]
 Filename: "{app}\\{#MyAppExeName}"; Description: "Launch System Squire"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function SetForegroundWindow(hWnd: Integer): Integer;
+external 'SetForegroundWindow@user32.dll stdcall';
+
+function ShowWindow(hWnd: Integer; nCmdShow: Integer): Integer;
+external 'ShowWindow@user32.dll stdcall';
+
+procedure EnsureWizardVisible;
+begin
+  ShowWindow(WizardForm.Handle, SW_SHOWNORMAL);
+  WizardForm.BringToFront;
+  SetForegroundWindow(WizardForm.Handle);
+end;
+
+procedure InitializeWizard;
+begin
+  EnsureWizardVisible;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  EnsureWizardVisible;
+end;
