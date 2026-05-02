@@ -1229,9 +1229,15 @@ namespace SystemSquire
         {
             try
             {
+                string toolPath = Path.Combine(AppContext.BaseDirectory, "minimize-to-tray.exe");
+                if (!File.Exists(toolPath))
+                {
+                    return false;
+                }
+
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "minimize-to-tray",
+                    FileName = toolPath,
                     Arguments = $"/NONOTIFY \"{appName}\"",
                     CreateNoWindow = true,
                     UseShellExecute = false

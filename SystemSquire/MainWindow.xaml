@@ -9,7 +9,6 @@
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize"
         Background="#1E1E1E"
-    Loaded="Window_Loaded"
         Closing="Window_Closing">
 
     <Window.Resources>
@@ -316,7 +315,7 @@
                               Content="Start Minimized to Tray"
                               Foreground="White"
                               FontSize="14"
-                              IsChecked="True"
+                              IsChecked="False"
                               Click="MainSettingChanged_Click"/>
 
                     <Grid Margin="0,12,0,0">
@@ -765,7 +764,7 @@
 
         <TextBlock x:Name="FooterTextBlock"
                    Grid.Row="3"
-                   Text="System Squire v2.0 • Made with C# WPF"
+                   Text="System Squire • Made with C# WPF • Configs are stored in AppData"
                    FontSize="12"
                    Foreground="#666666"
                    HorizontalAlignment="Center"

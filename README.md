@@ -1,214 +1,104 @@
 # System Squire
 
-A Windows desktop application for advanced system control via global hotkeys. Built with C# WPF using low-level Windows API keyboard hooks for reliable, precise hotkey detection.
+A Windows desktop utility for system control through global hotkeys, built with C# and WPF.
+
+Latest release download:
+- [Download System Squire (latest)](https://github.com/jesseloewen/System-Squire/releases/latest/download/System_Squire.zip)
+
+Creator website:
+- I also build electronics and gaming tools at [jesseloewen.com](https://jesseloewen.com).
 
 ## Features
 
-- **Smart Shutdown**: Initiate system shutdown with 10-second countdown
-  - Press hotkey again to cancel
-  - 5-second cooldown after cancellation
-- **Monitor Blackout**: Turn off monitors immediately
-  - Any mouse movement or keyboard input wakes monitors
-- **Configurable Hotkeys**: Record custom key combinations
-  - Default: `Ctrl+Alt+F8` (Shutdown), `Ctrl+Alt+F7` (Blackout)
-  - Exact match only - won't trigger on partial combinations
-- **System Tray Integration**: Runs minimized to tray
-- **Modern GUI**: WPF interface with dark theme
-- **Pushover Notifications**:
-  - Notify when System Squire starts
-  - Notify when System Squire exits
-  - Notify when selected apps start and/or close
-  - Per-app event selection (start, close, or both)
-  - Notify on machine inactivity with configurable resend interval
+- Smart shutdown with a 10-second countdown
+- Cancel shutdown by pressing the shutdown hotkey again
+- 5-second cooldown after a cancellation
+- Instant monitor blackout hotkey
+- Custom global hotkeys with exact-match detection
+- System tray support and start-minimized behavior
+- Pushover notifications for:
+  - App start and close events
+  - System Squire start and exit
+  - Machine inactivity with configurable resend interval
+
+Default hotkeys:
+- Shutdown: `Ctrl+Alt+F8`
+- Blackout: `Ctrl+Alt+F7`
 
 ## Requirements
 
-- Windows 10/11
-- .NET 8.0 Runtime or SDK
+- Windows 10 or 11
 
-## Building
+## Quick Start
 
-### Prerequisites
-- Visual Studio 2022 or later
-- .NET 8.0 SDK
+1. Download the latest release zip from the link above.
+2. Extract the zip.
+3. Run `System Squire.exe` from the extracted folder.
 
-### Build Instructions
+For best global hotkey reliability (including elevated apps), run as Administrator.
 
-1. Open solution in Visual Studio:
-   ```
-   SystemSquire.sln
-   ```
+## Build From Source
 
-2. Build the solution (Ctrl+Shift+B) or from command line:
-   ```powershell
-   dotnet build SystemSquire.sln --configuration Release
-   ```
+Prerequisites:
+- Visual Studio 2022+ or .NET 8 SDK
+- Inno Setup 6 (only required when building the installer `.exe`)
 
-3. Executable will be in:
-  - `SystemSquire\bin\Release\net8.0-windows\System Squire.exe`
+Build and publish:
 
-### Creating a Distributable Package
-
-After building in Release mode, copy the application output to a folder:
 ```powershell
-mkdir dist
-copy SystemSquire\bin\Release\net8.0-windows\*.exe dist\
-copy SystemSquire\bin\Release\net8.0-windows\*.dll dist\
+.\build.ps1
 ```
 
-## Running the Application
+Or:
 
-### From Visual Studio
-- Set `SystemSquire` as startup project
-- Press F5 to run
+```cmd
+build.bat
+```
 
-### From Built Executable
+Optional script flags:
+
 ```powershell
-cd SystemSquire\bin\Release\net8.0-windows
-.\System Squire.exe
+.\build.ps1 -NoRun
+.\build.ps1 -Configuration Debug
+.\build.ps1 -RuntimeIdentifier win-arm64
+.\build.ps1 -FrameworkDependent
+.\build.ps1 -BuildInstaller -NoRun
+.\build.ps1 -BuildInstaller -InstallerVersion 1.2.3 -NoRun
 ```
 
-### Running as Administrator (Recommended)
-For full system-wide hotkey detection (including in elevated applications):
-- Right-click `System Squire.exe`
-- Select "Run as administrator"
+Output:
+- `dist\System Squire.exe`
+- `installer\output\SystemSquireSetup-<version>.exe` (when `-BuildInstaller` is used)
 
-## Usage
+If `ISCC.exe` is not on `PATH`, set an environment variable before building:
 
-### First Launch
-1. Application starts minimized to system tray
-2. Double-click tray icon to open settings window
-3. Hotkeys are active immediately
-
-### Configuring Hotkeys
-1. Click "⏺ Record" button next to desired hotkey
-2. Press your key combination (e.g., Ctrl+Alt+F9)
-3. Click "💾 Save Configuration"
-4. Hotkeys are immediately active
-
-### Shutdown Function
-- Press configured shutdown hotkey (default: `Ctrl+Alt+F8`)
-- System will shutdown in 10 seconds
-- Press hotkey again to cancel
-- 5-second cooldown after cancellation
-
-### Blackout Function
-- Press configured blackout hotkey (default: `Ctrl+Alt+F7`)
-- Monitors turn off immediately
-- Move mouse or press any key to wake monitors
-
-### Pushover Notifications
-1. Click **Configure Pushover Notifications** in the main window.
-2. Enable notifications and enter your **App Token** and **User Key**.
-3. Choose global app events:
-  - System Squire start
-  - System Squire exit
-  - Inactivity (no user input)
-  - Set inactivity interval in minutes
-4. Add apps in **Apps To Watch For Start/Close**.
-5. For each app, choose **Start**, **Close**, or both.
-6. Save in the Pushover window, then save main configuration.
-
-The app monitors selected processes continuously while running and sends notifications according to each app's selected event toggles.
-When inactivity notifications are enabled, System Squire sends an alert after the configured idle interval and repeats at the same interval while the machine remains idle. Any user input resets the inactivity timer.
-
-## Architecture
-
-### Low-Level Keyboard Hook
-The application uses Windows `SetWindowsHookEx` with `WH_KEYBOARD_LL` to intercept keyboard events at the system level. This provides:
-- **Exact matching**: Only triggers on complete key combinations
-- **Suppression**: Prevents hotkeys from passing through to active windows
-- **Global scope**: Works across all applications
-
-### Key Components
-
-#### SystemSquire (Main Application)
-- **KeyboardHook.cs**: Low-level keyboard hook implementation
-  - Tracks pressed keys in real-time
-  - Matches exact combinations (modifiers + key)
-  - Suppresses matched hotkeys
-- **SystemOperations.cs**: System control functions
-  - Shutdown with countdown/cancellation
-  - Monitor power management via `SendMessage`
-- **ConfigManager.cs**: JSON-based configuration persistence
-- **MainWindow.xaml**: WPF GUI with modern styling
-
-### Configuration
-Settings are stored in `config.json` in the application directory:
-```json
-{
-  "ShutdownHotkey": "Ctrl+Alt+F8",
-  "BlackoutHotkey": "Ctrl+Alt+F7",
-  "StartMinimized": true,
-  "Pushover": {
-    "Enabled": true,
-    "ApiToken": "your_app_token",
-    "UserKey": "your_user_key",
-    "NotifyOnSystemSquireStart": true,
-    "NotifyOnSystemSquireClose": true,
-    "NotifyOnInactivity": true,
-    "InactivityNotificationMinutes": 30,
-    "LifecycleAppEventEntries": [
-      {
-        "Name": "chrome",
-        "NotifyOnStart": true,
-        "NotifyOnClose": false
-      },
-      {
-        "Name": "discord",
-        "NotifyOnStart": true,
-        "NotifyOnClose": true
-      }
-    ]
-  }
-}
+```powershell
+$env:INNO_SETUP_COMPILER = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 ```
+
+## Configuration
+
+Settings are stored in `config.json` in the application directory.
+
+Pushover setup:
+1. Open **Configure Pushover Notifications** in the main window.
+2. Enable notifications and enter your App Token and User Key.
+3. Choose which global events to notify on.
+4. Add app names and select start/close events per app.
+5. Save in both windows.
+
+## Technical Notes
+
+- Uses a low-level keyboard hook (`WH_KEYBOARD_LL`) for precise global hotkey matching.
+- Hotkeys trigger only on exact combinations (required modifiers + key, no extra modifiers).
+- Bundles `minimize-to-tray.exe` from https://github.com/danielgjackson/minimize-to-tray/ and copies it during build/publish.
 
 ## Troubleshooting
 
-### Hotkeys Not Working
-- **Run as Administrator**: Required for hotkeys to work in elevated applications
-- **Conflicting Hotkeys**: Choose different combinations if conflicts exist
-- **Check Configuration**: Verify settings saved correctly
-
-### Blackout Not Working
-- **Display Driver/OS Behavior**: Some systems may ignore monitor power messages
-
-### Application Won't Start
-- **.NET Runtime**: Install .NET 8.0 Runtime from Microsoft
-- **Multiple Instances**: Only one instance can run at a time
-
-## Technical Details
-
-### Windows API Usage
-- `SetWindowsHookEx`: Low-level keyboard/mouse hooks
-- `SendMessage`: Monitor power management
-- `shutdown.exe`: System shutdown command
-
-### Why C# Over Python?
-- **Better Keyboard Hooks**: Native Windows API integration
-- **Exact Match Logic**: Fine-grained control over key combinations
-- **Performance**: Lower latency for system-level hooks
-- **No Dependencies**: Self-contained executables
-
-### Hotkey Matching Logic
-The keyboard hook tracks all pressed keys and only triggers callbacks when:
-1. All required modifiers are pressed (Ctrl, Alt, Shift, Win)
-2. The main key is pressed
-3. No extra modifiers are pressed
-
-Example: `Ctrl+Alt+F8` will NOT trigger on:
-- Just `Ctrl`
-- Just `Alt`
-- `Ctrl+Alt`
-- `Ctrl+Alt+F6` (different key)
-- `Ctrl+Alt+Shift+F8` (extra modifier)
+- Hotkeys not working everywhere: run as Administrator.
+- Blackout not working: some display/driver combinations ignore monitor power messages.
+- App will not start: ensure all files from `dist` remain together.
 
 ## License
 
-This project is provided as-is for personal use.
-
-## Version History
-
-- **v2.0**: Complete C# rewrite with proper keyboard hooks
-- **v1.0**: Python implementation (deprecated)
+Provided as-is for personal use.

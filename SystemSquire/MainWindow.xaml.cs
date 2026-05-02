@@ -61,6 +61,7 @@ namespace SystemSquire
             }
 
             LoadConfiguration();
+            ApplyWindowPlacementFromConfig();
             RegisterHotkeys();
             _keyboardHook.InstallHook();
             _systemOps.StartLaunchWatchWindow();
@@ -80,10 +81,42 @@ namespace SystemSquire
             }
         }
 
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+        private void ApplyWindowPlacementFromConfig()
         {
-            MinWidth = Math.Ceiling(ActualWidth);
-            MinHeight = Math.Ceiling(ActualHeight);
+            if (HasStoredWindowBounds())
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Left = _configManager.Config.WindowLeft!.Value;
+                Top = _configManager.Config.WindowTop!.Value;
+                Width = _configManager.Config.WindowWidth!.Value;
+                Height = _configManager.Config.WindowHeight!.Value;
+            }
+
+            if (_configManager.Config.WindowIsMaximized)
+            {
+                WindowState = WindowState.Maximized;
+            }
+        }
+
+        private bool HasStoredWindowBounds()
+        {
+            return _configManager.Config.WindowLeft.HasValue &&
+                _configManager.Config.WindowTop.HasValue &&
+                _configManager.Config.WindowWidth.HasValue &&
+                _configManager.Config.WindowHeight.HasValue;
+        }
+
+        private void SaveWindowPlacementToConfig()
+        {
+            Rect bounds = WindowState == WindowState.Normal
+                ? new Rect(Left, Top, Width, Height)
+                : RestoreBounds;
+
+            _configManager.Config.WindowLeft = bounds.Left;
+            _configManager.Config.WindowTop = bounds.Top;
+            _configManager.Config.WindowWidth = bounds.Width;
+            _configManager.Config.WindowHeight = bounds.Height;
+            _configManager.Config.WindowIsMaximized = WindowState == WindowState.Maximized;
         }
 
         private void LoadConfiguration()
@@ -1158,9 +1191,11 @@ namespace SystemSquire
             int previousWebServicePort = _configManager.Config.WebServicePort;
             bool webServiceWasRunning = _remoteWebService.IsRunning;
 
+            SaveWindowPlacementToConfig();
+
             _configManager.Config.ShutdownHotkey = ShutdownHotkeyBox.Text;
             _configManager.Config.BlackoutHotkey = BlackoutHotkeyBox.Text;
-            _configManager.Config.StartMinimized = StartMinimizedCheckBox.IsChecked ?? true;
+            _configManager.Config.StartMinimized = StartMinimizedCheckBox.IsChecked ?? false;
             _configManager.Config.WebServicePort = GetWebServicePort();
             _configManager.Config.WebServiceAutoStart = WebServiceAutoStartCheckBox.IsChecked == true;
             _configManager.Config.AutoOpenWebPageOnStartup = AutoOpenWebPageOnStartupCheckBox.IsChecked == true;
@@ -1254,10 +1289,28 @@ namespace SystemSquire
 
         private async void MenuItem_Exit_Click(object sender, RoutedEventArgs e)
         {
-            PersistConfiguration(showConfirmation: false);
+            await ExitApplicationAsync(sendCloseNotification: true);
+        }
 
+        internal Task ExitForInstanceReplacementAsync()
+        {
+            return ExitApplicationAsync(sendCloseNotification: false);
+        }
+
+        private async Task ExitApplicationAsync(bool sendCloseNotification)
+        {
+            if (_isExitingApplication)
+            {
+                return;
+            }
+
+            PersistConfiguration(showConfirmation: false);
             _isExitingApplication = true;
-            await SendCloseNotificationIfEnabledAsync();
+
+            if (sendCloseNotification)
+            {
+                await SendCloseNotificationIfEnabledAsync();
+            }
 
             _systemOps.StopLaunchWatchWindow();
             _systemOps.StopAppLifecycleWatch();

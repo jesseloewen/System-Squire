@@ -4,6 +4,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
+    <Version>1.1.0</Version>
     <AssemblyName>System Squire</AssemblyName>
     <ApplicationIcon>Assets\system-squire-icon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -19,5 +20,13 @@
   <ItemGroup>
     <Resource Include="Assets\system-squire-icon.png" />
     <Resource Include="Assets\system-squire-icon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Tools\minimize-to-tray.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+      <TargetPath>minimize-to-tray.exe</TargetPath>
+    </None>
   </ItemGroup>
 </Project>

@@ -217,13 +217,18 @@ namespace SystemSquire
     {
         public string ShutdownHotkey { get; set; } = "Ctrl+Alt+F8";
         public string BlackoutHotkey { get; set; } = "Ctrl+Alt+F7";
-        public bool StartMinimized { get; set; } = true;
+        public bool StartMinimized { get; set; } = false;
         public int WebServicePort { get; set; } = 7745;
         public bool WebServiceAutoStart { get; set; } = false;
         public bool AutoOpenWebPageOnStartup { get; set; } = false;
         public bool WebServiceRequirePassword { get; set; } = false;
         public string WebServicePasswordHash { get; set; } = string.Empty;
         public string WebServicePasswordSalt { get; set; } = string.Empty;
+        public double? WindowLeft { get; set; }
+        public double? WindowTop { get; set; }
+        public double? WindowWidth { get; set; }
+        public double? WindowHeight { get; set; }
+        public bool WindowIsMaximized { get; set; } = false;
 
         // Legacy string lists are kept for backward compatibility with old config files.
         public List<string> AppsToKillBeforeShutdown { get; set; } = new();
@@ -248,6 +253,11 @@ namespace SystemSquire
             {
                 WebServiceRequirePassword = false;
             }
+
+            WindowLeft = NormalizeOptionalCoordinate(WindowLeft);
+            WindowTop = NormalizeOptionalCoordinate(WindowTop);
+            WindowWidth = NormalizeOptionalSize(WindowWidth);
+            WindowHeight = NormalizeOptionalSize(WindowHeight);
 
             AppsToKillBeforeShutdownEntries = NormalizeEntries(
                 AppsToKillBeforeShutdownEntries,
@@ -317,6 +327,26 @@ namespace SystemSquire
         private static int NormalizePort(int port)
         {
             return port is >= 1 and <= 65535 ? port : 7745;
+        }
+
+        private static double? NormalizeOptionalCoordinate(double? value)
+        {
+            if (!value.HasValue || double.IsNaN(value.Value) || double.IsInfinity(value.Value))
+            {
+                return null;
+            }
+
+            return value.Value;
+        }
+
+        private static double? NormalizeOptionalSize(double? value)
+        {
+            if (!value.HasValue || double.IsNaN(value.Value) || double.IsInfinity(value.Value) || value.Value <= 0)
+            {
+                return null;
+            }
+
+            return value.Value;
         }
     }
 
