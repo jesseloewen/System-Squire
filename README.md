@@ -3,7 +3,7 @@
 A Windows desktop utility for system control through global hotkeys, built with C# and WPF.
 
 Latest release download:
-- [Download System Squire (latest)](https://github.com/jesseloewen/System-Squire/releases/latest/download/System_Squire.zip)
+- [Download System Squire (latest)](https://github.com/jesseloewen/System-Squire/releases/latest/download/SystemSquireSetup-1.1.0.exe)
 
 Creator website:
 - I also build electronics and gaming tools at [jesseloewen.com](https://jesseloewen.com).
