@@ -32,10 +32,12 @@ echo   -RuntimeIdentifier RID
 echo   -FrameworkDependent
 echo   -BuildInstaller
 echo   -InstallerVersion X.Y.Z
+echo   -NoVersionInInstallerName
 echo.
 echo Examples:
 echo   build.bat
 echo   build.bat -Configuration Debug
 echo   build.bat -RuntimeIdentifier win-arm64 -FrameworkDependent
 echo   build.bat -BuildInstaller -InstallerVersion 1.2.0
+echo   build.bat -BuildInstaller -NoVersionInInstallerName
 exit /b 0

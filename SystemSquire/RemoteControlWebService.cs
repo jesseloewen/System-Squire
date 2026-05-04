@@ -102,7 +102,7 @@ namespace SystemSquire
                 if (TryCreateAndStartListener(port, "+", out listener, out string wildcardBindError))
                 {
                     IsRemoteAccessible = true;
-                    message = $"Web service started at http://localhost:{port}/ and is available on LAN via http://0.0.0.0:{port}/.";
+                    message = $"Web service started at http://localhost:{port}/.";
                     started = true;
                 }
                 else
@@ -120,7 +120,7 @@ namespace SystemSquire
                         {
                             IsRemoteAccessible = true;
                             message =
-                                $"Web service started at http://localhost:{port}/ and is available on LAN via http://0.0.0.0:{port}/. " +
+                                $"Web service started at http://localhost:{port}/. " +
                                 "Wildcard binding was enabled after URL ACL setup.";
                             started = true;
                         }
@@ -1008,6 +1008,22 @@ namespace SystemSquire
             font-size: 1.45rem;
         }
 
+        .title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .title-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 7px;
+            object-fit: contain;
+            border: 1px solid #3a4658;
+            background: #0f141d;
+            padding: 2px;
+        }
+
         p {
             color: var(--muted);
             margin: 8px 0 0;
@@ -1065,7 +1081,10 @@ namespace SystemSquire
 </head>
 <body>
     <main class="card">
-        <h1>System Squire Remote Login</h1>
+        <div class="title-row">
+            <img class="title-icon" src="/favicon.ico" alt="System Squire icon" />
+            <h1>System Squire Remote Login</h1>
+        </div>
         <p>Enter the configured password to access remote controls.</p>
 
         <label for="password">Password</label>
@@ -1182,6 +1201,22 @@ namespace SystemSquire
         .hero h1 {
             margin: 0;
             font-size: 1.6rem;
+        }
+
+        .hero-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .hero-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            object-fit: contain;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            background: rgba(10, 14, 20, 0.5);
+            padding: 2px;
         }
 
         .hero .status {
@@ -1405,7 +1440,10 @@ namespace SystemSquire
 <body>
     <div class="shell">
         <section class="hero">
-            <h1>System Squire Remote</h1>
+            <div class="hero-title">
+                <img class="hero-icon" src="/favicon.ico" alt="System Squire icon" />
+                <h1>System Squire Remote</h1>
+            </div>
             <div id="statusText" class="status">Loading state...</div>
             <div class="actions">
                 <button id="shutdownBtn" class="danger">Toggle Shutdown</button>
@@ -1421,6 +1459,10 @@ namespace SystemSquire
                 <summary>Main System Controls</summary>
                 <div class="group-body">
                     <div class="inline">
+                        <div>
+                            <label for="shutdownCountdown">Shutdown Countdown (sec)</label>
+                            <input id="shutdownCountdown" type="number" min="0" max="600" />
+                        </div>
                         <div>
                             <label for="watchDuration">Watch Duration (minutes)</label>
                             <input id="watchDuration" type="number" min="1" />
@@ -2025,6 +2067,7 @@ namespace SystemSquire
 
         function collectConfigPayload() {
             return {
+                shutdownCountdownSeconds: Number(document.getElementById("shutdownCountdown").value || 10),
                 launchWatchDurationMinutes: Number(document.getElementById("watchDuration").value || 1),
                 launchMinimizeDelaySeconds: Number(document.getElementById("minimizeDelay").value || 0),
                 appsToKillBeforeShutdown: collectEntries("killAppsList"),
@@ -2082,6 +2125,7 @@ namespace SystemSquire
 
         function attachAutoSaveHandlers() {
             const controlIds = [
+                "shutdownCountdown",
                 "watchDuration",
                 "minimizeDelay",
                 "pushoverEnabled",
@@ -2113,6 +2157,9 @@ namespace SystemSquire
             lastStateFingerprint = getStateFingerprint(state);
             document.getElementById("statusText").textContent = `Status: ${state.statusText} | Service port: ${state.webServicePort}`;
 
+            document.getElementById("shutdownCountdown").value = Number.isFinite(state.shutdownCountdownSeconds)
+                ? state.shutdownCountdownSeconds
+                : 10;
             document.getElementById("watchDuration").value = state.launchWatchDurationMinutes || 1;
             document.getElementById("minimizeDelay").value = state.launchMinimizeDelaySeconds || 0;
 

@@ -4,7 +4,8 @@ param(
     [string]$RuntimeIdentifier = "win-x64",
     [switch]$FrameworkDependent,
     [switch]$BuildInstaller,
-    [string]$InstallerVersion
+    [string]$InstallerVersion,
+    [switch]$NoVersionInInstallerName
 )
 
 Set-StrictMode -Version Latest
@@ -117,6 +118,32 @@ function Get-ResolvedInstallerVersion {
     return "1.1.0"
 }
 
+function Get-InstallerOutputBaseName {
+    param(
+        [string]$Version,
+        [bool]$UseUnversionedName
+    )
+
+    $defaultBaseName = "SystemSquireSetup"
+    if ($UseUnversionedName) {
+        return $defaultBaseName
+    }
+
+    $safeVersion = [string]$Version
+    $safeVersion = $safeVersion.Trim()
+    if ([string]::IsNullOrWhiteSpace($safeVersion)) {
+        return $defaultBaseName
+    }
+
+    $safeVersion = $safeVersion -replace "[^0-9A-Za-z._-]", "-"
+    $safeVersion = $safeVersion.Trim("-")
+    if ([string]::IsNullOrWhiteSpace($safeVersion)) {
+        return $defaultBaseName
+    }
+
+    return "$defaultBaseName-$safeVersion"
+}
+
 function Get-ResolvedTargetFramework {
     param([string]$ProjectFilePath)
 
@@ -155,12 +182,13 @@ try {
 
     $projectDirectory = Split-Path -Path $projectPath -Parent
     $targetFramework = Get-ResolvedTargetFramework -ProjectFilePath $projectPath
-    $publishPath = Join-Path (Join-Path (Join-Path $projectDirectory "bin") $Configuration) $targetFramework
+    $publishRootPath = Join-Path (Join-Path (Join-Path $projectDirectory "bin") $Configuration) $targetFramework
     if (-not [string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
-        $publishPath = Join-Path $publishPath $RuntimeIdentifier
+        $publishRootPath = Join-Path $publishRootPath $RuntimeIdentifier
     }
 
-    $publishPath = Join-Path $publishPath "publish"
+    $publishRootPath = Join-Path $publishRootPath "publish"
+    $publishPath = $publishRootPath
 
     $restoreArgs = @($solutionPath)
     if (-not [string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
@@ -171,8 +199,8 @@ try {
     Invoke-Dotnet -Command "restore" -Arguments $restoreArgs
 
     Write-Step "Prepare publish output"
-    if (Test-Path $publishPath) {
-        Remove-Item $publishPath -Recurse -Force
+    if (Test-Path $publishRootPath) {
+        Remove-Item $publishRootPath -Recurse -Force
     }
 
     $publishArgs = @(
@@ -184,6 +212,8 @@ try {
     if (-not [string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
         $publishArgs += @("--runtime", $RuntimeIdentifier)
     }
+
+    $publishArgs += @("--output", $publishPath)
 
     if ($selfContained) {
         $publishArgs += @("--self-contained", "true")
@@ -209,16 +239,17 @@ try {
         }
 
         $resolvedVersion = Get-ResolvedInstallerVersion -ProjectFilePath $projectPath
+        $installerOutputBaseName = Get-InstallerOutputBaseName -Version $resolvedVersion -UseUnversionedName $NoVersionInInstallerName.IsPresent
 
-        Write-Step "Build installer (Inno Setup, version $resolvedVersion)"
+        Write-Step "Build installer (Inno Setup, version $resolvedVersion, file $installerOutputBaseName.exe)"
         New-Item -ItemType Directory -Path $installerOutputPath -Force | Out-Null
 
-        & $isccPath "/DAppVersion=$resolvedVersion" "/DSourceDir=$publishPath" "/DOutputDir=$installerOutputPath" $installerScriptPath
+        & $isccPath "/DAppVersion=$resolvedVersion" "/DSourceDir=$publishPath" "/DOutputDir=$installerOutputPath" "/DOutputBaseFilename=$installerOutputBaseName" $installerScriptPath
         if ($LASTEXITCODE -ne 0) {
             throw "Installer build failed with exit code $LASTEXITCODE"
         }
 
-        $installerExeName = "SystemSquireSetup.exe"
+        $installerExeName = "$installerOutputBaseName.exe"
         $installerExePath = Join-Path $installerOutputPath $installerExeName
         Write-Host "Installer complete. Output file: $installerExePath" -ForegroundColor Green
     }

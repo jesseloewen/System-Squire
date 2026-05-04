@@ -67,6 +67,34 @@ Or:
 build.bat
 ```
 
+Build script parameters:
+
+- `-Configuration` (Debug or Release, default: Release)
+	- Selects the build configuration used for publish.
+- `-RuntimeIdentifier` (default: win-x64)
+	- Sets the target runtime for publish.
+- `-FrameworkDependent` (switch)
+	- Publishes as framework-dependent instead of self-contained.
+- `-BuildInstaller` (switch)
+	- Builds the Inno Setup installer after publish.
+- `-InstallerVersion` (string)
+	- Overrides installer version metadata.
+	- If omitted, version is read from the project file (`Version`, then `AssemblyVersion`, then `FileVersion`).
+- `-NoVersionInInstallerName` (switch)
+	- Uses `SystemSquireSetup.exe` instead of a versioned installer filename.
+
+All parameters are also available through `build.bat` and are forwarded to `build.ps1`.
+
+Installer build examples:
+
+```powershell
+# Default installer name includes version, e.g. SystemSquireSetup-1.1.0.exe
+.\build.ps1 -BuildInstaller
+
+# Keep legacy installer name without version suffix
+.\build.ps1 -BuildInstaller -NoVersionInInstallerName
+```
+
 ## Troubleshooting
 
 - Hotkeys not working in all apps: run System Squire as Administrator.

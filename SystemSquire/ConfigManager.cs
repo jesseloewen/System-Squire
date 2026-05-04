@@ -217,6 +217,8 @@ namespace SystemSquire
     {
         public string ShutdownHotkey { get; set; } = "Ctrl+Alt+F8";
         public string BlackoutHotkey { get; set; } = "Ctrl+Alt+F7";
+        public int ShutdownCountdownSeconds { get; set; } = 10;
+        public bool StartAtSystemStartup { get; set; } = false;
         public bool StartMinimized { get; set; } = false;
         public int WebServicePort { get; set; } = 7745;
         public bool WebServiceAutoStart { get; set; } = false;
@@ -244,6 +246,7 @@ namespace SystemSquire
 
         public void Normalize()
         {
+            ShutdownCountdownSeconds = NormalizeShutdownCountdownSeconds(ShutdownCountdownSeconds);
             WebServicePort = NormalizePort(WebServicePort);
             WebServicePasswordHash = WebServicePasswordHash?.Trim() ?? string.Empty;
             WebServicePasswordSalt = WebServicePasswordSalt?.Trim() ?? string.Empty;
@@ -327,6 +330,11 @@ namespace SystemSquire
         private static int NormalizePort(int port)
         {
             return port is >= 1 and <= 65535 ? port : 7745;
+        }
+
+        private static int NormalizeShutdownCountdownSeconds(int seconds)
+        {
+            return seconds is >= 0 and <= 600 ? seconds : 10;
         }
 
         private static double? NormalizeOptionalCoordinate(double? value)

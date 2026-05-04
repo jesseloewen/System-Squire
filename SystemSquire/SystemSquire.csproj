@@ -26,7 +26,7 @@
     <None Update="Tools\minimize-to-tray.exe">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>Always</CopyToPublishDirectory>
-      <TargetPath>minimize-to-tray.exe</TargetPath>
+      <TargetPath>Tools\minimize-to-tray.exe</TargetPath>
     </None>
   </ItemGroup>
 </Project>

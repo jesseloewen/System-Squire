@@ -96,6 +96,7 @@ namespace SystemSquire
         private bool _shutdownActive = false;
         private bool _cooldownActive = false;
         private CancellationTokenSource? _shutdownCts;
+        private int _shutdownCountdownSeconds = 10;
         private List<string> _appsToKillBeforeShutdown = new();
         private List<string> _appsToWatchAfterLaunch = new();
         private TimeSpan _launchWatchDuration = TimeSpan.FromMinutes(1);
@@ -130,6 +131,11 @@ namespace SystemSquire
                 .Select(NormalizeProcessName)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList() ?? new List<string>();
+        }
+
+        public void SetShutdownCountdownSeconds(int countdownSeconds)
+        {
+            _shutdownCountdownSeconds = Math.Clamp(countdownSeconds, 0, 600);
         }
 
         public void SetLaunchWatchConfiguration(IEnumerable<string>? processNames, int durationMinutes, int minimizeDelaySeconds)
@@ -330,18 +336,23 @@ namespace SystemSquire
             
             try
             {
+                int shutdownCountdownSeconds = Math.Clamp(_shutdownCountdownSeconds, 0, 600);
+                string countdownText = shutdownCountdownSeconds == 1
+                    ? "1 second"
+                    : $"{shutdownCountdownSeconds} seconds";
+
                 int killedCount = KillConfiguredApplications();
 
-                OnStatusChanged("Shutdown initiated - 10 seconds");
+                OnStatusChanged($"Shutdown initiated - {countdownText}");
                 if (killedCount > 0)
                 {
-                    OnStatusChanged($"Killed {killedCount} app process(es), shutdown in 10 seconds");
+                    OnStatusChanged($"Killed {killedCount} app process(es), shutdown in {countdownText}");
                 }
                 
                 var psi = new ProcessStartInfo
                 {
                     FileName = "shutdown",
-                    Arguments = "/sg /t 10",
+                    Arguments = $"/sg /t {shutdownCountdownSeconds}",
                     CreateNoWindow = true,
                     UseShellExecute = false
                 };
@@ -349,7 +360,7 @@ namespace SystemSquire
                 Process.Start(psi);
                 
                 // Wait for potential cancellation
-                await Task.Delay(10000, _shutdownCts.Token);
+                await Task.Delay(TimeSpan.FromSeconds(shutdownCountdownSeconds), _shutdownCts.Token);
             }
             catch (TaskCanceledException)
             {
@@ -453,6 +464,11 @@ namespace SystemSquire
 
                 if (!TryRunPowerShellCommand(command, out string output, out string errorMessage))
                 {
+                    if (IsAdapterNotFoundPowerShellError(errorMessage))
+                    {
+                        return null;
+                    }
+
                     OnStatusChanged($"Error: {errorMessage}");
                     return null;
                 }
@@ -494,6 +510,12 @@ namespace SystemSquire
                     {
                         OnStatusChanged("Wake-on-LAN change canceled because administrator approval was not granted.");
                         return ElevatedOperationResult.Cancelled;
+                    }
+
+                    if (IsAdapterNotFoundPowerShellError(errorMessage))
+                    {
+                        OnStatusChanged($"Wake-on-LAN adapter '{adapterName}' was not found.");
+                        return ElevatedOperationResult.Failed;
                     }
 
                     OnStatusChanged($"Error: {errorMessage}");
@@ -622,6 +644,18 @@ namespace SystemSquire
         private static string EscapeForSingleQuotedPowerShellString(string value)
         {
             return value.Replace("'", "''");
+        }
+
+        private static bool IsAdapterNotFoundPowerShellError(string errorMessage)
+        {
+            if (string.IsNullOrWhiteSpace(errorMessage))
+            {
+                return false;
+            }
+
+            return errorMessage.Contains("MSFT_NetAdapterPowerManagementSettingData", StringComparison.OrdinalIgnoreCase) &&
+                errorMessage.Contains("Name", StringComparison.OrdinalIgnoreCase) &&
+                errorMessage.Contains("objects found", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string BuildWrappedPowerShellCommand(string command)
@@ -1229,7 +1263,7 @@ namespace SystemSquire
         {
             try
             {
-                string toolPath = Path.Combine(AppContext.BaseDirectory, "minimize-to-tray.exe");
+                string toolPath = Path.Combine(AppContext.BaseDirectory, "Tools", "minimize-to-tray.exe");
                 if (!File.Exists(toolPath))
                 {
                     return false;

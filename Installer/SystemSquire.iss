@@ -15,6 +15,10 @@
   #define OutputDir "output"
 #endif
 
+#ifndef OutputBaseFilename
+  #define OutputBaseFilename "SystemSquireSetup"
+#endif
+
 [Setup]
 AppId={{6C41D8D8-8F76-48CA-A3A2-9CF9BEA51B5C}
 AppName={#MyAppName}
@@ -28,11 +32,12 @@ DefaultGroupName=System Squire
 DisableProgramGroupPage=yes
 DisableDirPage=no
 OutputDir={#OutputDir}
-OutputBaseFilename=SystemSquireSetup
+OutputBaseFilename={#OutputBaseFilename}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
+CloseApplications=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 SetupIconFile=..\\SystemSquire\\Assets\\system-squire-icon.ico
@@ -44,8 +49,17 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\\*"
+
 [Files]
 Source: "{#SourceDir}\\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "SystemSquire"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "SystemSquire"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "System Squire"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "System Squire"; ValueData: ""; Flags: uninsdeletevalue
 
 [Icons]
 Name: "{autoprograms}\\System Squire"; Filename: "{app}\\{#MyAppExeName}"

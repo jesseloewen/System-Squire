@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Microsoft.Win32;
 using Hardcodet.Wpf.TaskbarNotification;
 
 namespace SystemSquire
@@ -26,8 +27,12 @@ namespace SystemSquire
         private bool _isUpdatingEthernetWolState;
         private bool _isExitingApplication;
         private string _latestSystemStatus = "Monitoring Active";
+        private const int DefaultShutdownCountdownSeconds = 10;
+        private const int MaxShutdownCountdownSeconds = 600;
         private const int DefaultWebServicePort = 7745;
         private const string EthernetAdapterName = "Ethernet";
+        private const string StartupRunRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        private const string StartupEntryName = "SystemSquire";
 
         public MainWindow()
         {
@@ -79,6 +84,51 @@ namespace SystemSquire
                 this.ShowInTaskbar = false;
                 this.Hide();
             }
+
+            Dispatcher.BeginInvoke(
+                new Action(UpdateTrayMenuState),
+                System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        private MenuItem? TryGetTrayMenuItem(string itemName)
+        {
+            if (_trayIcon?.ContextMenu == null)
+            {
+                return null;
+            }
+
+            return _trayIcon.ContextMenu.Items
+                .OfType<MenuItem>()
+                .FirstOrDefault(menuItem =>
+                    string.Equals(menuItem.Name, itemName, StringComparison.Ordinal));
+        }
+
+        private void UpdateTrayMenuState()
+        {
+            MenuItem? trayMenuToggleWolItem = TryGetTrayMenuItem("TrayMenuToggleWolItem");
+            if (trayMenuToggleWolItem != null)
+            {
+                trayMenuToggleWolItem.IsEnabled = EthernetWolCheckBox.IsEnabled && !_isUpdatingEthernetWolState;
+                trayMenuToggleWolItem.IsChecked = EthernetWolCheckBox.IsChecked == true;
+            }
+
+            MenuItem? trayMenuToggleNotificationsItem = TryGetTrayMenuItem("TrayMenuToggleNotificationsItem");
+            if (trayMenuToggleNotificationsItem != null)
+            {
+                trayMenuToggleNotificationsItem.IsChecked = _configManager.Config.Pushover?.Enabled == true;
+            }
+
+            MenuItem? trayMenuToggleWebServiceItem = TryGetTrayMenuItem("TrayMenuToggleWebServiceItem");
+            if (trayMenuToggleWebServiceItem != null)
+            {
+                trayMenuToggleWebServiceItem.IsChecked = _remoteWebService.IsRunning;
+            }
+
+            MenuItem? trayMenuRestartWebServiceItem = TryGetTrayMenuItem("TrayMenuRestartWebServiceItem");
+            if (trayMenuRestartWebServiceItem != null)
+            {
+                trayMenuRestartWebServiceItem.IsEnabled = _remoteWebService.IsRunning;
+            }
         }
 
         private void ApplyWindowPlacementFromConfig()
@@ -123,6 +173,8 @@ namespace SystemSquire
         {
             ShutdownHotkeyBox.Text = _configManager.Config.ShutdownHotkey;
             BlackoutHotkeyBox.Text = _configManager.Config.BlackoutHotkey;
+            ShutdownCountdownSecondsBox.Text = _configManager.Config.ShutdownCountdownSeconds.ToString();
+            StartAtSystemStartupCheckBox.IsChecked = _configManager.Config.StartAtSystemStartup;
             StartMinimizedCheckBox.IsChecked = _configManager.Config.StartMinimized;
 
             PopulateConfiguredAppsList(
@@ -139,20 +191,29 @@ namespace SystemSquire
             WebServiceAutoStartCheckBox.IsChecked = _configManager.Config.WebServiceAutoStart;
             AutoOpenWebPageOnStartupCheckBox.IsChecked = _configManager.Config.AutoOpenWebPageOnStartup;
             WebRequirePasswordCheckBox.IsChecked = _configManager.Config.WebServiceRequirePassword;
+
+            if (_configManager.Config.EthernetWakeOnLanEnabled.HasValue)
+            {
+                EthernetWolCheckBox.IsChecked = _configManager.Config.EthernetWakeOnLanEnabled.Value;
+            }
+
             UpdateWebPasswordStatusText();
 
             RefreshRunningApplications();
             _systemOps.SetAppsToKillBeforeShutdown(GetConfiguredAppsToKill());
+            _systemOps.SetShutdownCountdownSeconds(GetShutdownCountdownSeconds());
             _systemOps.SetLaunchWatchConfiguration(
                 GetConfiguredAppsToWatchAtLaunch(),
                 GetLaunchWatchDurationMinutes(),
                 GetLaunchMinimizeDelaySeconds());
+            ApplyStartupRegistration(_configManager.Config.StartAtSystemStartup, showFailureDialog: false);
 
             ConfigurePushoverIntegrationFromConfig();
 
             ApplyTheme();
             RefreshEthernetWakeOnLanState();
             UpdateWebServiceStatusDisplay();
+            UpdateTrayMenuState();
         }
 
         private void ConfigurePushoverIntegrationFromConfig()
@@ -605,6 +666,19 @@ namespace SystemSquire
             return 1;
         }
 
+        private int GetShutdownCountdownSeconds()
+        {
+            if (int.TryParse(ShutdownCountdownSecondsBox.Text, out int seconds) &&
+                seconds >= 0 &&
+                seconds <= MaxShutdownCountdownSeconds)
+            {
+                return seconds;
+            }
+
+            ShutdownCountdownSecondsBox.Text = DefaultShutdownCountdownSeconds.ToString();
+            return DefaultShutdownCountdownSeconds;
+        }
+
         private int GetLaunchMinimizeDelaySeconds()
         {
             if (int.TryParse(LaunchMinimizeDelayBox.Text, out int seconds) && seconds >= 0)
@@ -628,8 +702,7 @@ namespace SystemSquire
         {
             _isUpdatingEthernetWolState = true;
             EthernetWolCheckBox.IsEnabled = false;
-            EthernetWolStatusText.Text = "Checking adapter state...";
-            EthernetWolStatusText.Foreground = new SolidColorBrush(Color.FromRgb(184, 184, 184));
+            UpdateTrayMenuState();
 
             bool? wolEnabled = await Task.Run(() => _systemOps.GetEthernetWakeOnLanEnabled(EthernetAdapterName));
 
@@ -639,20 +712,20 @@ namespace SystemSquire
             {
                 if (TryApplyStoredEthernetWakeOnLanState())
                 {
+                    UpdateTrayMenuState();
                     return;
                 }
 
                 EthernetWolCheckBox.IsChecked = false;
                 EthernetWolCheckBox.IsEnabled = false;
-                EthernetWolStatusText.Text = "Unable to read Ethernet power-management state.";
-                EthernetWolStatusText.Foreground = new SolidColorBrush(Color.FromRgb(231, 76, 60));
+                UpdateTrayMenuState();
                 return;
             }
 
             EthernetWolCheckBox.IsChecked = wolEnabled.Value;
             EthernetWolCheckBox.IsEnabled = true;
-            UpdateEthernetWolStatusText(wolEnabled.Value);
             SaveEthernetWakeOnLanState(wolEnabled.Value);
+            UpdateTrayMenuState();
         }
 
         private async void EthernetWolCheckBox_Click(object sender, RoutedEventArgs e)
@@ -663,11 +736,18 @@ namespace SystemSquire
             }
 
             bool targetState = EthernetWolCheckBox.IsChecked == true;
+            await SetEthernetWakeOnLanAsync(targetState);
+        }
+
+        private async Task SetEthernetWakeOnLanAsync(bool targetState)
+        {
             bool fallbackState = _configManager.Config.EthernetWakeOnLanEnabled ?? !targetState;
 
+            _isUpdatingEthernetWolState = true;
+            EthernetWolCheckBox.IsChecked = targetState;
             EthernetWolCheckBox.IsEnabled = false;
-            EthernetWolStatusText.Text = "Applying Wake-on-LAN setting...";
-            EthernetWolStatusText.Foreground = new SolidColorBrush(Color.FromRgb(184, 184, 184));
+            _isUpdatingEthernetWolState = false;
+            UpdateTrayMenuState();
 
             ElevatedOperationResult result = await Task.Run(() => _systemOps.SetEthernetWakeOnLanEnabled(targetState, EthernetAdapterName));
             if (result == ElevatedOperationResult.Cancelled)
@@ -676,9 +756,13 @@ namespace SystemSquire
                 EthernetWolCheckBox.IsChecked = fallbackState;
                 _isUpdatingEthernetWolState = false;
                 EthernetWolCheckBox.IsEnabled = true;
-                UpdateEthernetWolStatusText(
-                    fallbackState,
-                    "Change canceled because administrator approval was not granted.");
+                UpdateTrayMenuState();
+
+                MessageBox.Show(
+                    "Wake-on-LAN change was canceled because administrator approval was not granted.",
+                    "System Squire",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
                 return;
             }
 
@@ -772,9 +856,7 @@ namespace SystemSquire
             EthernetWolCheckBox.IsChecked = storedState;
             _isUpdatingEthernetWolState = false;
             EthernetWolCheckBox.IsEnabled = true;
-            UpdateEthernetWolStatusText(
-                storedState,
-                "Showing last saved state because current adapter state could not be read.");
+            UpdateTrayMenuState();
             return true;
         }
 
@@ -789,18 +871,14 @@ namespace SystemSquire
             _configManager.SaveConfig();
         }
 
-        private void UpdateEthernetWolStatusText(bool enabled, string? note = null)
+        private void RunShutdownButton_Click(object sender, RoutedEventArgs e)
         {
-            string baseText = enabled
-                ? "Wake-on-LAN is ON for Ethernet."
-                : "Wake-on-LAN is OFF for Ethernet.";
+            _systemOps.TriggerShutdown();
+        }
 
-            EthernetWolStatusText.Text = string.IsNullOrWhiteSpace(note)
-                ? baseText
-                : $"{baseText} {note}";
-            EthernetWolStatusText.Foreground = enabled
-                ? new SolidColorBrush(Color.FromRgb(46, 204, 113))
-                : new SolidColorBrush(Color.FromRgb(243, 156, 18));
+        private void ToggleBlackoutButton_Click(object sender, RoutedEventArgs e)
+        {
+            _systemOps.TriggerBlackout();
         }
 
         private void StartWebService_Click(object sender, RoutedEventArgs e)
@@ -812,6 +890,11 @@ namespace SystemSquire
         {
             _remoteWebService.Stop();
             UpdateWebServiceStatusDisplay();
+        }
+
+        private void RestartWebService_Click(object sender, RoutedEventArgs e)
+        {
+            RestartWebService(showFailureDialog: true);
         }
 
         private void OpenWebPage_Click(object sender, RoutedEventArgs e)
@@ -851,7 +934,19 @@ namespace SystemSquire
 
             StartWebServiceButton.IsEnabled = !running;
             StopWebServiceButton.IsEnabled = running;
-            OpenWebPageButton.IsEnabled = running;
+            RestartWebServiceButton.IsEnabled = running;
+            UpdateTrayMenuState();
+        }
+
+        private void RestartWebService(bool showFailureDialog)
+        {
+            if (_remoteWebService.IsRunning)
+            {
+                _remoteWebService.Stop();
+            }
+
+            TryStartWebService(openWebPage: false, showFailureDialog: showFailureDialog);
+            UpdateTrayMenuState();
         }
 
         private bool TryStartWebService(bool openWebPage, bool showFailureDialog)
@@ -962,6 +1057,7 @@ namespace SystemSquire
             return await InvokeOnUiThreadAsync(() => new RemoteControlState
             {
                 StatusText = _latestSystemStatus,
+                ShutdownCountdownSeconds = GetShutdownCountdownSeconds(),
                 LaunchWatchDurationMinutes = GetLaunchWatchDurationMinutes(),
                 LaunchMinimizeDelaySeconds = GetLaunchMinimizeDelaySeconds(),
                 AppsToKillBeforeShutdown = GetConfiguredAppEntries(AppsToKillListBox),
@@ -1065,6 +1161,10 @@ namespace SystemSquire
 
         private void ApplyRemoteConfigToUi(RemoteConfigUpdateRequest request)
         {
+            ShutdownCountdownSecondsBox.Text = Math.Clamp(
+                request.ShutdownCountdownSeconds,
+                0,
+                MaxShutdownCountdownSeconds).ToString();
             LaunchWatchDurationBox.Text = Math.Max(1, request.LaunchWatchDurationMinutes).ToString();
             LaunchMinimizeDelayBox.Text = Math.Max(0, request.LaunchMinimizeDelaySeconds).ToString();
 
@@ -1190,11 +1290,13 @@ namespace SystemSquire
         {
             int previousWebServicePort = _configManager.Config.WebServicePort;
             bool webServiceWasRunning = _remoteWebService.IsRunning;
+            bool previousStartAtSystemStartup = _configManager.Config.StartAtSystemStartup;
 
             SaveWindowPlacementToConfig();
 
             _configManager.Config.ShutdownHotkey = ShutdownHotkeyBox.Text;
             _configManager.Config.BlackoutHotkey = BlackoutHotkeyBox.Text;
+            _configManager.Config.StartAtSystemStartup = StartAtSystemStartupCheckBox.IsChecked == true;
             _configManager.Config.StartMinimized = StartMinimizedCheckBox.IsChecked ?? false;
             _configManager.Config.WebServicePort = GetWebServicePort();
             _configManager.Config.WebServiceAutoStart = WebServiceAutoStartCheckBox.IsChecked == true;
@@ -1206,6 +1308,7 @@ namespace SystemSquire
 
             _configManager.Config.AppsToKillBeforeShutdown = GetConfiguredAppsToKill();
             _configManager.Config.AppsToWatchAfterLaunch = GetConfiguredAppsToWatchAtLaunch();
+            _configManager.Config.ShutdownCountdownSeconds = GetShutdownCountdownSeconds();
             _configManager.Config.LaunchWatchDurationMinutes = GetLaunchWatchDurationMinutes();
             _configManager.Config.LaunchMinimizeDelaySeconds = GetLaunchMinimizeDelaySeconds();
             _configManager.Config.EthernetWakeOnLanEnabled = EthernetWolCheckBox.IsChecked;
@@ -1213,8 +1316,14 @@ namespace SystemSquire
             _configManager.Config.Pushover.Normalize();
 
             _configManager.SaveConfig();
+            if (previousStartAtSystemStartup != _configManager.Config.StartAtSystemStartup)
+            {
+                ApplyStartupRegistration(_configManager.Config.StartAtSystemStartup, showFailureDialog: true);
+            }
+
             UpdateWebPasswordStatusText();
             _systemOps.SetAppsToKillBeforeShutdown(_configManager.Config.AppsToKillBeforeShutdown);
+            _systemOps.SetShutdownCountdownSeconds(_configManager.Config.ShutdownCountdownSeconds);
             _systemOps.SetLaunchWatchConfiguration(
                 _configManager.Config.AppsToWatchAfterLaunch,
                 _configManager.Config.LaunchWatchDurationMinutes,
@@ -1256,6 +1365,62 @@ namespace SystemSquire
                 : new SolidColorBrush(Color.FromRgb(243, 156, 18));
         }
 
+        private void ApplyStartupRegistration(bool enabled, bool showFailureDialog)
+        {
+            try
+            {
+                if (enabled)
+                {
+                    string executablePath = GetCurrentExecutablePath();
+                    string startupCommand = $"\"{executablePath}\"";
+
+                    using RegistryKey? runKey = Registry.CurrentUser.CreateSubKey(StartupRunRegistryPath, writable: true);
+                    if (runKey == null)
+                    {
+                        throw new InvalidOperationException("Unable to open startup registry key.");
+                    }
+
+                    string? existingCommand = runKey.GetValue(StartupEntryName) as string;
+                    if (!string.Equals(existingCommand, startupCommand, StringComparison.OrdinalIgnoreCase))
+                    {
+                        runKey.SetValue(StartupEntryName, startupCommand, RegistryValueKind.String);
+                    }
+
+                    return;
+                }
+
+                using RegistryKey? existingRunKey = Registry.CurrentUser.OpenSubKey(StartupRunRegistryPath, writable: true);
+                existingRunKey?.DeleteValue(StartupEntryName, throwOnMissingValue: false);
+            }
+            catch (Exception ex)
+            {
+                if (showFailureDialog)
+                {
+                    MessageBox.Show(
+                        $"Unable to update startup setting: {ex.Message}",
+                        "System Squire",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
+            }
+        }
+
+        private static string GetCurrentExecutablePath()
+        {
+            string? executablePath = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(executablePath))
+            {
+                executablePath = Process.GetCurrentProcess().MainModule?.FileName;
+            }
+
+            if (string.IsNullOrWhiteSpace(executablePath))
+            {
+                throw new InvalidOperationException("Unable to resolve current executable path.");
+            }
+
+            return executablePath;
+        }
+
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             if (_isExitingApplication)
@@ -1272,6 +1437,95 @@ namespace SystemSquire
         private void TrayIcon_TrayMouseDoubleClick(object sender, RoutedEventArgs e)
         {
             ShowMainWindow();
+        }
+
+        private void TrayContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            UpdateTrayMenuState();
+        }
+
+        private void MenuItem_Shutdown_Click(object sender, RoutedEventArgs e)
+        {
+            _systemOps.TriggerShutdown();
+        }
+
+        private void MenuItem_Blackout_Click(object sender, RoutedEventArgs e)
+        {
+            _systemOps.TriggerBlackout();
+        }
+
+        private async void MenuItem_ToggleWol_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingEthernetWolState)
+            {
+                return;
+            }
+
+            if (sender is not MenuItem menuItem)
+            {
+                return;
+            }
+
+            await SetEthernetWakeOnLanAsync(menuItem.IsChecked);
+        }
+
+        private void MenuItem_ToggleNotifications_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem menuItem)
+            {
+                return;
+            }
+
+            _configManager.Config.Pushover ??= new PushoverConfig();
+            bool enableNotifications = menuItem.IsChecked;
+
+            if (enableNotifications &&
+                (string.IsNullOrWhiteSpace(_configManager.Config.Pushover.ApiToken) ||
+                 string.IsNullOrWhiteSpace(_configManager.Config.Pushover.UserKey)))
+            {
+                menuItem.IsChecked = false;
+                enableNotifications = false;
+
+                MessageBox.Show(
+                    "Set your Pushover App Token and User Key before enabling notifications.",
+                    "System Squire",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+
+            _configManager.Config.Pushover.Enabled = enableNotifications;
+            _configManager.Config.Pushover.Normalize();
+            _configManager.SaveConfig();
+            ConfigurePushoverIntegrationFromConfig();
+            UpdateTrayMenuState();
+        }
+
+        private void MenuItem_ToggleWebService_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not MenuItem menuItem)
+            {
+                return;
+            }
+
+            if (menuItem.IsChecked)
+            {
+                if (!TryStartWebService(openWebPage: false, showFailureDialog: true))
+                {
+                    menuItem.IsChecked = false;
+                }
+            }
+            else
+            {
+                _remoteWebService.Stop();
+                UpdateWebServiceStatusDisplay();
+            }
+
+            UpdateTrayMenuState();
+        }
+
+        private void MenuItem_RestartWebService_Click(object sender, RoutedEventArgs e)
+        {
+            RestartWebService(showFailureDialog: true);
         }
 
         private void MenuItem_Show_Click(object sender, RoutedEventArgs e)

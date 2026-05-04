@@ -5,6 +5,7 @@ namespace SystemSquire
     public sealed class RemoteControlState
     {
         public string StatusText { get; set; } = "Ready";
+        public int ShutdownCountdownSeconds { get; set; } = 10;
         public int LaunchWatchDurationMinutes { get; set; } = 1;
         public int LaunchMinimizeDelaySeconds { get; set; } = 0;
         public List<ConfiguredAppEntry> AppsToKillBeforeShutdown { get; set; } = new();
@@ -17,6 +18,7 @@ namespace SystemSquire
 
     public sealed class RemoteConfigUpdateRequest
     {
+        public int ShutdownCountdownSeconds { get; set; } = 10;
         public int LaunchWatchDurationMinutes { get; set; } = 1;
         public int LaunchMinimizeDelaySeconds { get; set; }
         public List<ConfiguredAppEntry> AppsToKillBeforeShutdown { get; set; } = new();
