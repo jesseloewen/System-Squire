@@ -223,6 +223,8 @@ namespace SystemSquire
         public int WebServicePort { get; set; } = 7745;
         public bool WebServiceAutoStart { get; set; } = false;
         public bool AutoOpenWebPageOnStartup { get; set; } = false;
+        public bool AutoCheckForUpdates { get; set; } = true;
+        public bool AutoDownloadUpdates { get; set; } = true;
         public bool WebServiceRequirePassword { get; set; } = false;
         public string WebServicePasswordHash { get; set; } = string.Empty;
         public string WebServicePasswordSalt { get; set; } = string.Empty;
@@ -369,6 +371,7 @@ namespace SystemSquire
         private readonly string _legacyConfigPath;
 
         public AppConfig Config { get; private set; }
+        public string ConfigPath => _configPath;
 
         public ConfigManager()
         {
@@ -424,6 +427,32 @@ namespace SystemSquire
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error saving config: {ex.Message}");
+            }
+        }
+
+        public bool TryDeleteConfigFiles(out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            try
+            {
+                DeleteIfExists(_configPath);
+                DeleteIfExists(_legacyConfigPath);
+                Config = new AppConfig();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = ex.Message;
+                return false;
+            }
+        }
+
+        private static void DeleteIfExists(string path)
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
             }
         }
 

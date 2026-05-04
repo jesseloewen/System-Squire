@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Media;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -20,11 +22,16 @@ namespace SystemSquire
         private readonly SystemOperations _systemOps;
         private readonly PushoverNotificationService _pushoverService;
         private readonly RemoteControlWebService _remoteWebService;
+        private readonly GitHubUpdateService _updateService;
         private PushoverConfigWindow? _pushoverConfigWindow;
+        private UpdateReleaseInfo? _latestAvailableUpdate;
         private bool _isRecording = false;
         private string? _recordingTarget = null;
         private TaskbarIcon? _trayIcon;
         private bool _isUpdatingEthernetWolState;
+        private bool _isCheckingForUpdates;
+        private bool _isDownloadingUpdate;
+        private bool _isResettingSettings;
         private bool _isExitingApplication;
         private string _latestSystemStatus = "Monitoring Active";
         private const int DefaultShutdownCountdownSeconds = 10;
@@ -33,15 +40,19 @@ namespace SystemSquire
         private const string EthernetAdapterName = "Ethernet";
         private const string StartupRunRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
         private const string StartupEntryName = "SystemSquire";
+        private const string GitHubRepoOwner = "jesseloewen";
+        private const string GitHubRepoName = "System-Squire";
 
         public MainWindow()
         {
             InitializeComponent();
+            SetVersionText();
 
             _configManager = new ConfigManager();
             _keyboardHook = new KeyboardHook();
             _systemOps = new SystemOperations();
             _pushoverService = new PushoverNotificationService();
+            _updateService = new GitHubUpdateService(GitHubRepoOwner, GitHubRepoName);
             _remoteWebService = new RemoteControlWebService(
                 GetRemoteControlStateAsync,
                 TriggerShutdownFromRemoteAsync,
@@ -66,11 +77,25 @@ namespace SystemSquire
             }
 
             LoadConfiguration();
+            InitializeUpdateStatusDisplay();
             ApplyWindowPlacementFromConfig();
             RegisterHotkeys();
             _keyboardHook.InstallHook();
             _systemOps.StartLaunchWatchWindow();
+            CleanupOutdatedDownloadedInstallers();
             _ = SendStartupNotificationIfEnabledAsync();
+            if (_configManager.Config.AutoCheckForUpdates)
+            {
+                _ = CheckForUpdatesAsync(triggeredByUser: false);
+            }
+            else
+            {
+                SetUpdateStatus(
+                    "Auto-check disabled. Click Check.",
+                    Color.FromRgb(184, 184, 184),
+                    Color.FromRgb(184, 184, 184));
+                RefreshUpdateControls();
+            }
 
             if (_configManager.Config.WebServiceAutoStart || _configManager.Config.AutoOpenWebPageOnStartup)
             {
@@ -190,6 +215,8 @@ namespace SystemSquire
             WebServicePortBox.Text = NormalizeWebServicePort(_configManager.Config.WebServicePort).ToString();
             WebServiceAutoStartCheckBox.IsChecked = _configManager.Config.WebServiceAutoStart;
             AutoOpenWebPageOnStartupCheckBox.IsChecked = _configManager.Config.AutoOpenWebPageOnStartup;
+            AutoCheckForUpdatesCheckBox.IsChecked = _configManager.Config.AutoCheckForUpdates;
+            AutoDownloadUpdatesCheckBox.IsChecked = _configManager.Config.AutoDownloadUpdates;
             WebRequirePasswordCheckBox.IsChecked = _configManager.Config.WebServiceRequirePassword;
 
             if (_configManager.Config.EthernetWakeOnLanEnabled.HasValue)
@@ -275,6 +302,534 @@ namespace SystemSquire
             SubtitleTextBlock.Foreground = new SolidColorBrush(Color.FromRgb(136, 136, 136));
             FooterTextBlock.Foreground = new SolidColorBrush(Color.FromRgb(102, 102, 102));
             StatusLabelText.Foreground = new SolidColorBrush(Colors.White);
+        }
+
+        private void InitializeUpdateStatusDisplay()
+        {
+            _latestAvailableUpdate = null;
+            SetUpdateStatus(
+                "Checking for updates...",
+                Color.FromRgb(184, 184, 184),
+                Color.FromRgb(184, 184, 184));
+            RefreshUpdateControls();
+        }
+
+        private void SetUpdateStatus(string message, Color indicatorColor, Color textColor)
+        {
+            UpdateStatusIndicator.Fill = new SolidColorBrush(indicatorColor);
+            UpdateStatusText.Text = message;
+            UpdateStatusText.Foreground = new SolidColorBrush(textColor);
+        }
+
+        private void RefreshUpdateControls()
+        {
+            bool isBusy = _isCheckingForUpdates || _isDownloadingUpdate || _isResettingSettings;
+            string? downloadedInstallerPath = GetDownloadedInstallerPathForLatestUpdate();
+
+            CheckForUpdatesButton.IsEnabled = !isBusy;
+            DownloadAndInstallUpdateButton.IsEnabled =
+                !isBusy &&
+                _latestAvailableUpdate != null;
+            AutoCheckForUpdatesCheckBox.IsEnabled = !isBusy;
+            AutoDownloadUpdatesCheckBox.IsEnabled = !isBusy;
+            ResetAllSettingsButton.IsEnabled = !isBusy;
+
+            CheckForUpdatesButton.Content = _isCheckingForUpdates ? "Checking..." : "Check";
+            if (_isDownloadingUpdate)
+            {
+                DownloadAndInstallUpdateButton.Content = "Downloading...";
+            }
+            else if (_latestAvailableUpdate != null && !string.IsNullOrWhiteSpace(downloadedInstallerPath))
+            {
+                DownloadAndInstallUpdateButton.Content = "Install Update";
+            }
+            else
+            {
+                DownloadAndInstallUpdateButton.Content = "Download and Install";
+            }
+
+            ResetAllSettingsButton.Content = _isResettingSettings
+                ? "Resetting..."
+                : "Reset Settings";
+        }
+
+        private void CleanupOutdatedDownloadedInstallers()
+        {
+            try
+            {
+                _updateService.DeleteDownloadedInstallerFilesAtOrBelowVersion(BuildVersion.Display);
+            }
+            catch
+            {
+                // Cleanup is best-effort and should not block startup.
+            }
+        }
+
+        private async Task CheckForUpdatesAsync(bool triggeredByUser)
+        {
+            if (_isCheckingForUpdates)
+            {
+                return;
+            }
+
+            bool isAutomaticCheck = !triggeredByUser;
+
+            _isCheckingForUpdates = true;
+            SetUpdateStatus(
+                "Checking for updates...",
+                Color.FromRgb(184, 184, 184),
+                Color.FromRgb(184, 184, 184));
+            RefreshUpdateControls();
+
+            try
+            {
+                UpdateCheckResult result = await _updateService.CheckForUpdateAsync(BuildVersion.Display);
+                if (!result.Success)
+                {
+                    _latestAvailableUpdate = null;
+                    SetUpdateStatus(
+                        result.Message,
+                        Color.FromRgb(231, 76, 60),
+                        Color.FromRgb(231, 76, 60));
+
+                    if (triggeredByUser)
+                    {
+                        MessageBox.Show(
+                            result.Message,
+                            "System Squire",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
+
+                    return;
+                }
+
+                if (result.UpdateAvailable && result.LatestRelease != null)
+                {
+                    _latestAvailableUpdate = result.LatestRelease;
+                    string? downloadedInstallerPath = GetDownloadedInstallerPathForLatestUpdate();
+                    if (!string.IsNullOrWhiteSpace(downloadedInstallerPath))
+                    {
+                        SetUpdateStatus(
+                            $"Update v{result.LatestVersionText} is ready to install.",
+                            Color.FromRgb(46, 204, 113),
+                            Color.FromRgb(46, 204, 113));
+
+                        if (isAutomaticCheck)
+                        {
+                            NotifyUpdateReadyToInstall(result.LatestVersionText, playDing: true);
+                        }
+                    }
+                    else if (isAutomaticCheck && AutoDownloadUpdatesCheckBox.IsChecked == true)
+                    {
+                        string? autoDownloadedInstallerPath = await DownloadLatestUpdateAsync(triggeredByUser: false);
+                        if (!string.IsNullOrWhiteSpace(autoDownloadedInstallerPath))
+                        {
+                            SetUpdateStatus(
+                                $"Update v{result.LatestVersionText} is ready to install.",
+                                Color.FromRgb(46, 204, 113),
+                                Color.FromRgb(46, 204, 113));
+                            NotifyUpdateReadyToInstall(result.LatestVersionText, playDing: true);
+                        }
+                    }
+                    else
+                    {
+                        SetUpdateStatus(
+                            $"Update available: v{result.LatestVersionText}",
+                            Color.FromRgb(243, 156, 18),
+                            Color.FromRgb(243, 156, 18));
+
+                        if (isAutomaticCheck)
+                        {
+                            NotifyUpdateAvailable(result.LatestVersionText, playDing: true);
+                        }
+                    }
+
+                    return;
+                }
+
+                _latestAvailableUpdate = null;
+                string displayVersion = string.IsNullOrWhiteSpace(result.CurrentVersionText)
+                    ? BuildVersion.Display
+                    : result.CurrentVersionText;
+                SetUpdateStatus(
+                    $"Up to date (v{displayVersion})",
+                    Color.FromRgb(46, 204, 113),
+                    Color.FromRgb(46, 204, 113));
+            }
+            catch (Exception ex)
+            {
+                _latestAvailableUpdate = null;
+                SetUpdateStatus(
+                    $"Unable to check updates: {ex.Message}",
+                    Color.FromRgb(231, 76, 60),
+                    Color.FromRgb(231, 76, 60));
+
+                if (triggeredByUser)
+                {
+                    MessageBox.Show(
+                        $"Unable to check updates: {ex.Message}",
+                        "System Squire",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
+            }
+            finally
+            {
+                _isCheckingForUpdates = false;
+                RefreshUpdateControls();
+            }
+        }
+
+        private async void CheckForUpdatesButton_Click(object sender, RoutedEventArgs e)
+        {
+            await CheckForUpdatesAsync(triggeredByUser: true);
+        }
+
+        private async void DownloadAndInstallUpdateButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isDownloadingUpdate)
+            {
+                return;
+            }
+
+            if (_latestAvailableUpdate == null)
+            {
+                await CheckForUpdatesAsync(triggeredByUser: true);
+                if (_latestAvailableUpdate == null)
+                {
+                    MessageBox.Show(
+                        "No update is currently available.",
+                        "System Squire",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+            }
+
+            try
+            {
+                string? installerPath = await DownloadLatestUpdateAsync(triggeredByUser: true);
+                if (string.IsNullOrWhiteSpace(installerPath))
+                {
+                    return;
+                }
+
+                MessageBoxResult launchResult = MessageBox.Show(
+                    "Update installer is ready. Start setup now?\n\nSystem Squire will close before setup runs.",
+                    "System Squire",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (launchResult != MessageBoxResult.Yes)
+                {
+                    return;
+                }
+
+                if (!TryLaunchInstaller(installerPath, out string launchError))
+                {
+                    SetUpdateStatus(
+                        launchError,
+                        Color.FromRgb(231, 76, 60),
+                        Color.FromRgb(231, 76, 60));
+
+                    MessageBox.Show(
+                        launchError,
+                        "System Squire",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                await ExitApplicationAsync(sendCloseNotification: true);
+            }
+            catch (Exception ex)
+            {
+                SetUpdateStatus(
+                    $"Update install failed: {ex.Message}",
+                    Color.FromRgb(231, 76, 60),
+                    Color.FromRgb(231, 76, 60));
+
+                MessageBox.Show(
+                    $"Update install failed: {ex.Message}",
+                    "System Squire",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
+        private async Task<string?> DownloadLatestUpdateAsync(bool triggeredByUser)
+        {
+            if (_latestAvailableUpdate == null)
+            {
+                return null;
+            }
+
+            if (_isDownloadingUpdate)
+            {
+                return null;
+            }
+
+            string? downloadedInstallerPath = GetDownloadedInstallerPathForLatestUpdate();
+            if (!string.IsNullOrWhiteSpace(downloadedInstallerPath))
+            {
+                SetUpdateStatus(
+                    $"Installer already downloaded: {Path.GetFileName(downloadedInstallerPath)}",
+                    Color.FromRgb(46, 204, 113),
+                    Color.FromRgb(46, 204, 113));
+                return downloadedInstallerPath;
+            }
+
+            _isDownloadingUpdate = true;
+            RefreshUpdateControls();
+
+            try
+            {
+                SetUpdateStatus(
+                    $"Downloading v{_latestAvailableUpdate.VersionText}...",
+                    Color.FromRgb(14, 99, 156),
+                    Color.FromRgb(184, 220, 245));
+
+                UpdateDownloadResult result = await _updateService.DownloadInstallerAsync(_latestAvailableUpdate);
+                if (!result.Success || string.IsNullOrWhiteSpace(result.DownloadedFilePath))
+                {
+                    SetUpdateStatus(
+                        result.Message,
+                        Color.FromRgb(231, 76, 60),
+                        Color.FromRgb(231, 76, 60));
+
+                    if (triggeredByUser)
+                    {
+                        MessageBox.Show(
+                            result.Message,
+                            "System Squire",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                    }
+
+                    return null;
+                }
+
+                SetUpdateStatus(
+                    $"Downloaded {Path.GetFileName(result.DownloadedFilePath)}",
+                    Color.FromRgb(46, 204, 113),
+                    Color.FromRgb(46, 204, 113));
+                return result.DownloadedFilePath;
+            }
+            catch (Exception ex)
+            {
+                SetUpdateStatus(
+                    $"Unable to download update: {ex.Message}",
+                    Color.FromRgb(231, 76, 60),
+                    Color.FromRgb(231, 76, 60));
+
+                if (triggeredByUser)
+                {
+                    MessageBox.Show(
+                        $"Unable to download update: {ex.Message}",
+                        "System Squire",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                }
+
+                return null;
+            }
+            finally
+            {
+                _isDownloadingUpdate = false;
+                RefreshUpdateControls();
+            }
+        }
+
+        private void NotifyUpdateAvailable(string latestVersionText, bool playDing)
+        {
+            ShowUpdateDesktopNotification($"Update v{latestVersionText} is available.", playDing);
+        }
+
+        private void NotifyUpdateReadyToInstall(string latestVersionText, bool playDing)
+        {
+            ShowUpdateDesktopNotification($"Update v{latestVersionText} is ready to install.", playDing);
+        }
+
+        private void ShowUpdateDesktopNotification(string message, bool playDing)
+        {
+            if (playDing)
+            {
+                try
+                {
+                    SystemSounds.Asterisk.Play();
+                }
+                catch
+                {
+                    // Best-effort sound cue.
+                }
+            }
+
+            _trayIcon?.ShowBalloonTip("System Squire Update", message, BalloonIcon.Info);
+        }
+
+        private async void ResetAllSettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isResettingSettings)
+            {
+                return;
+            }
+
+            MessageBoxResult confirmResult = MessageBox.Show(
+                "Reset settings now? This deletes config.json and restarts System Squire.",
+                "System Squire",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (confirmResult != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            _isResettingSettings = true;
+            RefreshUpdateControls();
+
+            try
+            {
+                if (!_configManager.TryDeleteConfigFiles(out string deleteError))
+                {
+                    string errorMessage = string.IsNullOrWhiteSpace(deleteError)
+                        ? "Unable to delete config.json."
+                        : $"Unable to delete config.json: {deleteError}";
+
+                    SetUpdateStatus(
+                        errorMessage,
+                        Color.FromRgb(231, 76, 60),
+                        Color.FromRgb(231, 76, 60));
+
+                    MessageBox.Show(
+                        errorMessage,
+                        "System Squire",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (!TryRestartApplication(out string restartError))
+                {
+                    SetUpdateStatus(
+                        restartError,
+                        Color.FromRgb(231, 76, 60),
+                        Color.FromRgb(231, 76, 60));
+
+                    MessageBox.Show(
+                        restartError,
+                        "System Squire",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                SetUpdateStatus(
+                    "Settings reset. Restarting...",
+                    Color.FromRgb(46, 204, 113),
+                    Color.FromRgb(46, 204, 113));
+
+                await ExitApplicationAsync(sendCloseNotification: false, persistConfiguration: false);
+            }
+            catch (Exception ex)
+            {
+                SetUpdateStatus(
+                    $"Unable to reset settings: {ex.Message}",
+                    Color.FromRgb(231, 76, 60),
+                    Color.FromRgb(231, 76, 60));
+
+                MessageBox.Show(
+                    $"Unable to reset settings: {ex.Message}",
+                    "System Squire",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            finally
+            {
+                _isResettingSettings = false;
+                RefreshUpdateControls();
+            }
+        }
+
+        private string? GetDownloadedInstallerPathForLatestUpdate()
+        {
+            return _updateService.GetDownloadedInstallerPath(_latestAvailableUpdate);
+        }
+
+        private static bool TryLaunchInstaller(string installerPath, out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(installerPath) || !File.Exists(installerPath))
+            {
+                errorMessage = "Downloaded installer file could not be found.";
+                return false;
+            }
+
+            try
+            {
+                ProcessStartInfo startInfo = new()
+                {
+                    FileName = installerPath,
+                    WorkingDirectory = Path.GetDirectoryName(installerPath) ?? string.Empty,
+                    UseShellExecute = true
+                };
+
+                Process? process = Process.Start(startInfo);
+                if (process == null)
+                {
+                    errorMessage = "Installer could not be started.";
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                errorMessage = "Installer launch was canceled.";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Unable to launch installer: {ex.Message}";
+                return false;
+            }
+        }
+
+        private static bool TryRestartApplication(out string errorMessage)
+        {
+            errorMessage = string.Empty;
+
+            try
+            {
+                string executablePath = GetCurrentExecutablePath();
+                ProcessStartInfo startInfo = new()
+                {
+                    FileName = executablePath,
+                    WorkingDirectory = Path.GetDirectoryName(executablePath) ?? string.Empty,
+                    UseShellExecute = true
+                };
+
+                Process? process = Process.Start(startInfo);
+                if (process == null)
+                {
+                    errorMessage = "Unable to restart System Squire.";
+                    return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Unable to restart System Squire: {ex.Message}";
+                return false;
+            }
+        }
+
+        private void SetVersionText()
+        {
+            FooterTextBlock.Text = $"System Squire v{BuildVersion.Display} • Made with C# WPF • Configs are stored in AppData";
         }
 
         private void RegisterHotkeys()
@@ -1057,6 +1612,7 @@ namespace SystemSquire
             return await InvokeOnUiThreadAsync(() => new RemoteControlState
             {
                 StatusText = _latestSystemStatus,
+                AppVersion = BuildVersion.Display,
                 ShutdownCountdownSeconds = GetShutdownCountdownSeconds(),
                 LaunchWatchDurationMinutes = GetLaunchWatchDurationMinutes(),
                 LaunchMinimizeDelaySeconds = GetLaunchMinimizeDelaySeconds(),
@@ -1301,6 +1857,8 @@ namespace SystemSquire
             _configManager.Config.WebServicePort = GetWebServicePort();
             _configManager.Config.WebServiceAutoStart = WebServiceAutoStartCheckBox.IsChecked == true;
             _configManager.Config.AutoOpenWebPageOnStartup = AutoOpenWebPageOnStartupCheckBox.IsChecked == true;
+            _configManager.Config.AutoCheckForUpdates = AutoCheckForUpdatesCheckBox.IsChecked == true;
+            _configManager.Config.AutoDownloadUpdates = AutoDownloadUpdatesCheckBox.IsChecked == true;
             _configManager.Config.WebServiceRequirePassword = WebRequirePasswordCheckBox.IsChecked == true;
 
             _configManager.Config.AppsToKillBeforeShutdownEntries = GetConfiguredAppEntries(AppsToKillListBox);
@@ -1551,14 +2109,18 @@ namespace SystemSquire
             return ExitApplicationAsync(sendCloseNotification: false);
         }
 
-        private async Task ExitApplicationAsync(bool sendCloseNotification)
+        private async Task ExitApplicationAsync(bool sendCloseNotification, bool persistConfiguration = true)
         {
             if (_isExitingApplication)
             {
                 return;
             }
 
-            PersistConfiguration(showConfirmation: false);
+            if (persistConfiguration)
+            {
+                PersistConfiguration(showConfirmation: false);
+            }
+
             _isExitingApplication = true;
 
             if (sendCloseNotification)

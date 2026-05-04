@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:tb="http://www.hardcodet.net/taskbar"
         Title="System Squire"
-        Height="920" Width="1180"
-        MinHeight="900" MinWidth="1120"
+        Height="978" Width="985"
+        MinHeight="978" MinWidth="985"
         Icon="Assets/system-squire-icon.ico"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize"
@@ -327,7 +327,7 @@
         </tb:TaskbarIcon>
     </Window.Resources>
 
-    <Grid Margin="20,20,20,16">
+    <Grid Margin="14,12,14,10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -335,201 +335,272 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Image Source="Assets/system-squire-icon.png"
-                       Width="36"
-                       Height="36"
-                       Stretch="Uniform"
-                       Margin="0,0,10,0"
-                       VerticalAlignment="Center"/>
-                <TextBlock x:Name="TitleTextBlock"
-                           Text="System Squire"
-                           FontSize="34"
-                           FontWeight="Bold"
-                           Foreground="#FFFFFF"
-                           HorizontalAlignment="Left"
+        <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="310"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Image Source="Assets/system-squire-icon.png"
+                           Width="30"
+                           Height="30"
+                           Stretch="Uniform"
+                           Margin="0,0,8,0"
                            VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TitleTextBlock"
+                               Text="System Squire"
+                               FontSize="28"
+                               FontWeight="Bold"
+                               Foreground="#FFFFFF"
+                               HorizontalAlignment="Left"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock x:Name="SubtitleTextBlock"
+                           Text="Advanced System Control and Hotkey Manager"
+                           FontSize="13"
+                           Foreground="#888888"
+                           HorizontalAlignment="Left"
+                           Margin="0,3,0,0"
+                           TextWrapping="Wrap"/>
             </StackPanel>
-            <TextBlock x:Name="SubtitleTextBlock"
-                       Text="Advanced System Control and Hotkey Manager"
-                       FontSize="15"
-                       Foreground="#888888"
-                       HorizontalAlignment="Left"
-                       Margin="0,4,0,0"/>
-        </StackPanel>
+
+            <Border Grid.Column="1"
+                    Background="#252526"
+                    BorderBrush="#3E3E42"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="10">
+                <StackPanel>
+                    <TextBlock Text="Updates"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="White"
+                               Margin="0,0,0,6"/>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse x:Name="UpdateStatusIndicator"
+                                 Width="10"
+                                 Height="10"
+                                 Fill="#B8B8B8"
+                                 Margin="0,0,8,0"/>
+                        <TextBlock x:Name="UpdateStatusText"
+                                   Text="Checking for updates..."
+                                   Foreground="#B8B8B8"
+                                   VerticalAlignment="Center"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+
+                    <CheckBox x:Name="AutoCheckForUpdatesCheckBox"
+                              Content="Auto-check for updates"
+                              Foreground="White"
+                              FontSize="12"
+                              Margin="0,8,0,0"
+                              IsChecked="True"
+                              Click="MainSettingChanged_Click"/>
+
+                    <CheckBox x:Name="AutoDownloadUpdatesCheckBox"
+                              Content="Auto-download updates"
+                              Foreground="White"
+                              FontSize="12"
+                              Margin="0,4,0,0"
+                              IsChecked="True"
+                              Click="MainSettingChanged_Click"/>
+
+                    <WrapPanel Margin="0,10,0,0">
+                        <Button x:Name="CheckForUpdatesButton"
+                                Content="Check"
+                                Width="80"
+                                Margin="0,0,8,0"
+                                Click="CheckForUpdatesButton_Click"/>
+
+                        <Button x:Name="DownloadAndInstallUpdateButton"
+                                Content="Download and Install"
+                                MinWidth="164"
+                                Background="#2E7D32"
+                                Click="DownloadAndInstallUpdateButton_Click"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
 
         <Border Grid.Row="1"
                 Background="#2D2D2D"
                 CornerRadius="8"
-                Padding="14"
-                Margin="0,0,0,16">
-            <StackPanel Orientation="Horizontal">
+                Padding="10"
+                Margin="0,0,0,10">
+            <WrapPanel>
                 <TextBlock x:Name="StatusLabelText"
                            Text="Status:"
-                           FontSize="16"
+                           FontSize="15"
                            FontWeight="Bold"
                            Foreground="White"
                            VerticalAlignment="Center"/>
                 <Ellipse x:Name="StatusIndicator"
-                         Width="12"
-                         Height="12"
+                         Width="10"
+                         Height="10"
                          Fill="#2ECC71"
-                         Margin="10,0,10,0"/>
+                         Margin="8,0,8,0"
+                         VerticalAlignment="Center"/>
                 <TextBlock x:Name="StatusText"
                            Text="Monitoring Active"
-                           FontSize="16"
+                           FontSize="15"
                            Foreground="#2ECC71"
-                           VerticalAlignment="Center"/>
-            </StackPanel>
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"/>
+            </WrapPanel>
         </Border>
 
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="520"/>
-                <ColumnDefinition Width="20"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0"
                     Background="#2D2D2D"
                     CornerRadius="8"
-                    Padding="20">
+                    Padding="12"
+                    Margin="0,0,0,8">
                 <StackPanel>
-                    <TextBlock Text="Hotkey Configuration"
-                               FontSize="20"
-                               FontWeight="Bold"
-                               Foreground="White"
-                               Margin="0,0,0,16"/>
+                    <Border Background="#252526"
+                            BorderBrush="#3E3E42"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="8"
+                            Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="Hotkeys and Quick Actions"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       Foreground="White"/>
+                        <StackPanel Margin="0,10,0,0">
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="90"/>
+                                </Grid.ColumnDefinitions>
 
-                    <Grid Margin="0,0,0,14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="130"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="110"/>
-                        </Grid.ColumnDefinitions>
+                                <Label Content="Shutdown:" Grid.Column="0" VerticalAlignment="Center"/>
+                                <TextBox x:Name="ShutdownHotkeyBox" Grid.Column="1" Margin="0,0,8,0" IsReadOnly="True"/>
+                                <Button Content="Record" Grid.Column="2" Style="{StaticResource RecordButton}" Click="RecordShutdownHotkey_Click"/>
+                            </Grid>
 
-                        <Label Content="Shutdown:" Grid.Column="0" VerticalAlignment="Center"/>
-                        <TextBox x:Name="ShutdownHotkeyBox" Grid.Column="1" Margin="0,0,10,0" IsReadOnly="True"/>
-                        <Button Content="⏺ Record" Grid.Column="2" Style="{StaticResource RecordButton}" Click="RecordShutdownHotkey_Click"/>
-                    </Grid>
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="90"/>
+                                </Grid.ColumnDefinitions>
 
-                    <Grid Margin="0,0,0,12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="130"/>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="110"/>
-                        </Grid.ColumnDefinitions>
+                                <Label Content="Blackout:" Grid.Column="0" VerticalAlignment="Center"/>
+                                <TextBox x:Name="BlackoutHotkeyBox" Grid.Column="1" Margin="0,0,8,0" IsReadOnly="True"/>
+                                <Button Content="Record" Grid.Column="2" Style="{StaticResource RecordButton}" Click="RecordBlackoutHotkey_Click"/>
+                            </Grid>
 
-                        <Label Content="Blackout:" Grid.Column="0" VerticalAlignment="Center"/>
-                        <TextBox x:Name="BlackoutHotkeyBox" Grid.Column="1" Margin="0,0,10,0" IsReadOnly="True"/>
-                        <Button Content="⏺ Record" Grid.Column="2" Style="{StaticResource RecordButton}" Click="RecordBlackoutHotkey_Click"/>
-                    </Grid>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="75"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                    <Grid Margin="0,0,0,20">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="130"/>
-                            <ColumnDefinition Width="90"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+                                <Label Content="Shutdown Delay:" Grid.Column="0" VerticalAlignment="Center"/>
+                                <TextBox x:Name="ShutdownCountdownSecondsBox"
+                                         Grid.Column="1"
+                                         Margin="0,0,8,0"
+                                         HorizontalContentAlignment="Center"
+                                         Text="10"
+                                         LostFocus="MainSettingChanged_LostFocus"/>
+                                <TextBlock Grid.Column="2"
+                                           Text="Seconds, 0 = immediate"
+                                           Foreground="#9D9D9D"
+                                           VerticalAlignment="Center"
+                                           TextWrapping="Wrap"/>
+                            </Grid>
 
-                        <Label Content="Shutdown Delay:" Grid.Column="0" VerticalAlignment="Center"/>
-                        <TextBox x:Name="ShutdownCountdownSecondsBox"
-                                 Grid.Column="1"
-                                 Margin="0,0,10,0"
-                                 HorizontalContentAlignment="Center"
-                                 Text="10"
-                                 LostFocus="MainSettingChanged_LostFocus"/>
-                        <TextBlock Grid.Column="2"
-                                   Text="Seconds, 0 = immediate"
-                                   Foreground="#9D9D9D"
-                                   VerticalAlignment="Center"/>
-                    </Grid>
+                            <CheckBox x:Name="StartAtSystemStartupCheckBox"
+                                      Content="Start at System Startup"
+                                      Foreground="White"
+                                      FontSize="14"
+                                      Margin="0,0,0,6"
+                                      IsChecked="False"
+                                      Click="MainSettingChanged_Click"/>
 
-                    <TextBlock Text="General"
-                               FontSize="16"
-                               FontWeight="Bold"
-                               Foreground="White"
-                               Margin="0,0,0,10"/>
+                            <CheckBox x:Name="StartMinimizedCheckBox"
+                                      Content="Start Minimized to Tray"
+                                      Foreground="White"
+                                      FontSize="14"
+                                      Margin="0,0,0,6"
+                                      IsChecked="False"
+                                      Click="MainSettingChanged_Click"/>
 
-                    <CheckBox x:Name="StartAtSystemStartupCheckBox"
-                              Content="Start at System Startup"
-                              Foreground="White"
-                              FontSize="14"
-                              Margin="0,0,0,6"
-                              IsChecked="False"
-                              Click="MainSettingChanged_Click"/>
+                            <CheckBox x:Name="EthernetWolCheckBox"
+                                      Content="Enable Wake-on-LAN (Ethernet)"
+                                      Foreground="White"
+                                      FontSize="14"
+                                      Click="EthernetWolCheckBox_Click"/>
 
-                    <CheckBox x:Name="StartMinimizedCheckBox"
-                              Content="Start Minimized to Tray"
-                              Foreground="White"
-                              FontSize="14"
-                              Margin="0,0,0,6"
-                              IsChecked="False"
-                              Click="MainSettingChanged_Click"/>
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                    <CheckBox x:Name="EthernetWolCheckBox"
-                              Content="Enable Wake-on-LAN (Ethernet)"
-                              Foreground="White"
-                              FontSize="14"
-                              Click="EthernetWolCheckBox_Click"/>
+                                <Button x:Name="RunShutdownButton"
+                                        Grid.Column="0"
+                                        Content="Run Shutdown"
+                                        Background="#A04040"
+                                        Click="RunShutdownButton_Click"/>
 
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
+                                <Button x:Name="ToggleBlackoutButton"
+                                        Grid.Column="2"
+                                        Content="Toggle Blackout"
+                                        Background="#3E3E42"
+                                        Click="ToggleBlackoutButton_Click"/>
+                            </Grid>
 
-                        <Button x:Name="RunShutdownButton"
-                                Grid.Column="0"
-                                Content="Run Shutdown"
-                                Background="#A04040"
-                                Click="RunShutdownButton_Click"/>
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                        <Button x:Name="ToggleBlackoutButton"
-                                Grid.Column="2"
-                                Content="Toggle Blackout"
-                                Background="#3E3E42"
-                                Click="ToggleBlackoutButton_Click"/>
-                    </Grid>
+                                <Button x:Name="ConfigurePushoverButton"
+                                        Grid.Column="0"
+                                        Content="Configure Pushover Notifications"
+                                        Click="ConfigurePushover_Click"/>
 
-                    <Grid Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Button x:Name="ConfigurePushoverButton"
-                                Grid.Column="0"
-                                Content="Configure Pushover Notifications"
-                                Click="ConfigurePushover_Click"/>
-
-                        <Button x:Name="TestPushoverNotificationButton"
-                                Grid.Column="2"
-                                Content="Send Test Notification"
-                                Background="#2E7D32"
-                                Click="TestPushoverNotification_Click"/>
-                    </Grid>
+                                <Button x:Name="TestPushoverNotificationButton"
+                                        Grid.Column="2"
+                                        Content="Send Test Notification"
+                                        Background="#2E7D32"
+                                        Click="TestPushoverNotification_Click"/>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
 
                     <Border Background="#252526"
                             BorderBrush="#3E3E42"
                             BorderThickness="1"
                             CornerRadius="6"
-                            Padding="12"
-                            Margin="0,14,0,0">
+                            Padding="8">
                         <StackPanel>
                             <TextBlock Text="Web Remote Control"
-                                       FontSize="16"
+                                       FontSize="14"
                                        FontWeight="Bold"
-                                       Foreground="White"
-                                       Margin="0,0,0,8"/>
-
+                                       Foreground="White"/>
+                        <StackPanel Margin="0,10,0,0">
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="130"/>
-                                    <ColumnDefinition Width="90"/>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="78"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
@@ -545,7 +616,8 @@
                                 <TextBlock Grid.Column="2"
                                            Text="Default: 7745"
                                            Foreground="#9D9D9D"
-                                           VerticalAlignment="Center"/>
+                                           VerticalAlignment="Center"
+                                           TextWrapping="Wrap"/>
                             </Grid>
 
                             <CheckBox x:Name="WebServiceAutoStartCheckBox"
@@ -572,8 +644,8 @@
                             <Grid Margin="0,8,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="10"/>
-                                    <ColumnDefinition Width="130"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="120"/>
                                 </Grid.ColumnDefinitions>
 
                                 <PasswordBox x:Name="WebPasswordBox"
@@ -604,9 +676,9 @@
                             <Grid Margin="0,10,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="8"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="8"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
@@ -620,42 +692,45 @@
                                         Background="#A04040"
                                         Click="StopWebService_Click"/>
                                 <Button x:Name="RestartWebServiceButton"
-                                    Grid.Column="4"
-                                    Content="Restart Service"
-                                    Background="#8A5A2B"
-                                    Click="RestartWebService_Click"/>
+                                        Grid.Column="4"
+                                        Content="Restart Service"
+                                        Background="#8A5A2B"
+                                        Click="RestartWebService_Click"/>
                             </Grid>
                         </StackPanel>
-                    </Border>
-
+                    </StackPanel>
+                </Border>
                 </StackPanel>
             </Border>
 
-            <ScrollViewer Grid.Column="2"
-                          VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
+            <Border Grid.Column="2"
+                    Background="#2D2D2D"
+                    CornerRadius="8"
+                    Padding="12"
+                    Margin="0,0,0,8">
                 <StackPanel>
-                    <Border Background="#2D2D2D"
-                            CornerRadius="8"
-                            Padding="20"
-                            Margin="0,0,0,14">
+                    <Border Background="#252526"
+                            BorderBrush="#3E3E42"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="8"
+                            Margin="0,0,0,10">
                         <StackPanel>
                             <TextBlock Text="Watch Apps At Launch"
-                                       FontSize="18"
+                                       FontSize="14"
                                        FontWeight="Bold"
-                                       Foreground="White"
-                                       Margin="0,0,0,8"/>
-
+                                       Foreground="White"/>
+                        <StackPanel Margin="0,10,0,0">
                             <TextBlock Text="If a listed app starts during the watch window, System Squire runs: minimize-to-tray /NONOTIFY &lt;name&gt;"
                                        FontSize="12"
                                        Foreground="#B8B8B8"
                                        TextWrapping="Wrap"
                                        Margin="0,0,0,10"/>
 
-                            <Grid Margin="0,0,0,10">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="220"/>
-                                    <ColumnDefinition Width="85"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="78"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
@@ -674,10 +749,10 @@
                                            VerticalAlignment="Center"/>
                             </Grid>
 
-                            <Grid Margin="0,0,0,10">
+                            <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="220"/>
-                                    <ColumnDefinition Width="85"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="78"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
@@ -699,8 +774,8 @@
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="110"/>
-                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="96"/>
+                                    <ColumnDefinition Width="96"/>
                                 </Grid.ColumnDefinitions>
 
                                 <ComboBox x:Name="LaunchWatchAppsComboBox"
@@ -708,7 +783,7 @@
                                           Style="{StaticResource ReadableSelectorComboBox}"
                                           Height="35"
                                           ItemContainerStyle="{StaticResource RunningAppsComboBoxItemStyle}"
-                                          Margin="0,0,10,0">
+                                          Margin="0,0,8,0">
                                     <ComboBox.Resources>
                                         <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#2D2D2D"/>
                                         <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#2D2D2D"/>
@@ -720,17 +795,17 @@
                                     </ComboBox.Resources>
                                 </ComboBox>
 
-                                <Button Content="Add" Grid.Column="1" Margin="0,0,10,0" Click="AddLaunchWatchApp_Click"/>
+                                <Button Content="Add" Grid.Column="1" Margin="0,0,8,0" Click="AddLaunchWatchApp_Click"/>
                                 <Button Content="Refresh" Grid.Column="2" Click="RefreshLaunchWatchApps_Click"/>
                             </Grid>
 
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="96"/>
                                 </Grid.ColumnDefinitions>
 
-                                <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                <StackPanel Grid.Column="0" Margin="0,0,8,0">
                                     <Border Background="#252526"
                                             BorderBrush="#3E3E42"
                                             BorderThickness="1,1,1,0"
@@ -738,7 +813,7 @@
                                             Padding="8,4">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="70"/>
+                                                <ColumnDefinition Width="56"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
 
@@ -757,7 +832,7 @@
                                     </Border>
 
                                     <ListBox x:Name="AppsToWatchAtLaunchListBox"
-                                             Height="146"
+                                             Height="110"
                                              Background="#1E1E1E"
                                              Foreground="White"
                                              BorderBrush="#3E3E42"
@@ -769,7 +844,7 @@
                                             <DataTemplate>
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="70"/>
+                                                        <ColumnDefinition Width="56"/>
                                                         <ColumnDefinition Width="*"/>
                                                     </Grid.ColumnDefinitions>
 
@@ -795,23 +870,25 @@
                                 <Button Content="Remove" Grid.Column="1" VerticalAlignment="Top" Click="RemoveLaunchWatchApp_Click"/>
                             </Grid>
                         </StackPanel>
-                    </Border>
+                    </StackPanel>
+                </Border>
 
-                    <Border Background="#2D2D2D"
-                            CornerRadius="8"
-                            Padding="20">
+                    <Border Background="#252526"
+                            BorderBrush="#3E3E42"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="8">
                         <StackPanel>
                             <TextBlock Text="Kill Apps Before Shutdown"
-                                       FontSize="18"
+                                       FontSize="14"
                                        FontWeight="Bold"
-                                       Foreground="White"
-                                       Margin="0,0,0,10"/>
-
+                                       Foreground="White"/>
+                        <StackPanel Margin="0,10,0,0">
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="110"/>
-                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="96"/>
+                                    <ColumnDefinition Width="96"/>
                                 </Grid.ColumnDefinitions>
 
                                 <ComboBox x:Name="RunningAppsComboBox"
@@ -819,7 +896,7 @@
                                           Style="{StaticResource ReadableSelectorComboBox}"
                                           Height="35"
                                           ItemContainerStyle="{StaticResource RunningAppsComboBoxItemStyle}"
-                                          Margin="0,0,10,0">
+                                          Margin="0,0,8,0">
                                     <ComboBox.Resources>
                                         <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#2D2D2D"/>
                                         <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#2D2D2D"/>
@@ -831,17 +908,17 @@
                                     </ComboBox.Resources>
                                 </ComboBox>
 
-                                <Button Content="Add" Grid.Column="1" Margin="0,0,10,0" Click="AddSelectedApp_Click"/>
+                                <Button Content="Add" Grid.Column="1" Margin="0,0,8,0" Click="AddSelectedApp_Click"/>
                                 <Button Content="Refresh" Grid.Column="2" Click="RefreshRunningApps_Click"/>
                             </Grid>
 
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="96"/>
                                 </Grid.ColumnDefinitions>
 
-                                <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                                <StackPanel Grid.Column="0" Margin="0,0,8,0">
                                     <Border Background="#252526"
                                             BorderBrush="#3E3E42"
                                             BorderThickness="1,1,1,0"
@@ -849,7 +926,7 @@
                                             Padding="8,4">
                                         <Grid>
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="70"/>
+                                                <ColumnDefinition Width="56"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
 
@@ -868,7 +945,7 @@
                                     </Border>
 
                                     <ListBox x:Name="AppsToKillListBox"
-                                             Height="146"
+                                             Height="110"
                                              Background="#1E1E1E"
                                              Foreground="White"
                                              BorderBrush="#3E3E42"
@@ -880,7 +957,7 @@
                                             <DataTemplate>
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="70"/>
+                                                        <ColumnDefinition Width="56"/>
                                                         <ColumnDefinition Width="*"/>
                                                     </Grid.ColumnDefinitions>
 
@@ -906,17 +983,37 @@
                                 <Button Content="Remove" Grid.Column="1" VerticalAlignment="Top" Click="RemoveSelectedApp_Click"/>
                             </Grid>
                         </StackPanel>
-                    </Border>
+                    </StackPanel>
+                </Border>
                 </StackPanel>
-            </ScrollViewer>
+            </Border>
         </Grid>
 
-        <TextBlock x:Name="FooterTextBlock"
-                   Grid.Row="3"
-                   Text="System Squire • Made with C# WPF • Configs are stored in AppData"
-                   FontSize="12"
-                   Foreground="#666666"
-                   HorizontalAlignment="Center"
-                   Margin="0,14,0,10"/>
+        <Grid Grid.Row="3" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="FooterTextBlock"
+                       Grid.Column="0"
+                       Text="System Squire • Version loading... • Made with C# WPF • Configs are stored in AppData"
+                       FontSize="12"
+                       Foreground="#666666"
+                       HorizontalAlignment="Left"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       Margin="0,0,12,0"/>
+
+            <Button x:Name="ResetAllSettingsButton"
+                    Grid.Column="1"
+                    Content="Reset Settings"
+                    MinWidth="106"
+                    Height="30"
+                    FontSize="12"
+                    Padding="8,4"
+                    Background="#A04040"
+                    Click="ResetAllSettingsButton_Click"/>
+        </Grid>
     </Grid>
 </Window>

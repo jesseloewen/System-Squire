@@ -1209,6 +1209,14 @@ namespace SystemSquire
             gap: 12px;
         }
 
+        .hero-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
         .hero-icon {
             width: 34px;
             height: 34px;
@@ -1222,6 +1230,17 @@ namespace SystemSquire
         .hero .status {
             margin-top: 8px;
             color: #d8e0ea;
+        }
+
+        .version-pill {
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            border-radius: 999px;
+            background: rgba(10, 18, 30, 0.45);
+            color: #dbe6f4;
+            font-size: 0.78rem;
+            letter-spacing: 0.02em;
+            padding: 5px 10px;
+            white-space: nowrap;
         }
 
         .panel {
@@ -1440,9 +1459,12 @@ namespace SystemSquire
 <body>
     <div class="shell">
         <section class="hero">
-            <div class="hero-title">
-                <img class="hero-icon" src="/favicon.ico" alt="System Squire icon" />
-                <h1>System Squire Remote</h1>
+            <div class="hero-top">
+                <div class="hero-title">
+                    <img class="hero-icon" src="/favicon.ico" alt="System Squire icon" />
+                    <h1>System Squire Remote</h1>
+                </div>
+                <div id="appVersionText" class="version-pill">Version loading...</div>
             </div>
             <div id="statusText" class="status">Loading state...</div>
             <div class="actions">
@@ -2155,6 +2177,10 @@ namespace SystemSquire
             suppressAutoSave = true;
             currentState = state;
             lastStateFingerprint = getStateFingerprint(state);
+            const versionText = (state.appVersion || "").trim();
+            document.getElementById("appVersionText").textContent = versionText
+                ? `Version v${versionText}`
+                : "Version unknown";
             document.getElementById("statusText").textContent = `Status: ${state.statusText} | Service port: ${state.webServicePort}`;
 
             document.getElementById("shutdownCountdown").value = Number.isFinite(state.shutdownCountdownSeconds)

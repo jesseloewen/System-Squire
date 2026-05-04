@@ -4,19 +4,16 @@ System Squire is a Windows desktop utility for fast, keyboard-driven system cont
 
 ## Download
 
-Install the latest official release here:
+Get the latest official release:
 
-- **[Download SystemSquireSetup.exe](https://github.com/jesseloewen/System-Squire/releases/latest/download/SystemSquireSetup.exe)**
-
-You can also browse all releases:
-
-- [GitHub Releases](https://github.com/jesseloewen/System-Squire/releases)
+- **[View latest release on GitHub](https://github.com/jesseloewen/System-Squire/releases/latest)**
 
 ## Features
 
 - Configurable global hotkeys for shutdown and monitor blackout actions
 - Smart shutdown flow with countdown, cancellation, and cooldown protection
 - System tray support with start-minimized behavior
+- Built-in GitHub update support with auto-check and optional auto-download
 - Optional Pushover notifications for app and system activity
 - Per-app notification controls for start and close events
 
@@ -31,9 +28,10 @@ Default hotkeys:
 
 ## Installation
 
-1. Download **SystemSquireSetup.exe** from the link above.
-2. Run the installer.
-3. Launch System Squire from the Start menu.
+1. Open the latest release page from the link above.
+2. Download the Windows installer from the **Assets** section.
+3. Run the installer.
+4. Launch System Squire from the Start menu.
 
 For best global hotkey reliability, run as Administrator.
 
@@ -47,6 +45,14 @@ To enable Pushover notifications:
 2. Enable notifications and enter your App Token and User Key.
 3. Choose the events you want to receive.
 4. Save your settings.
+
+## Updates
+
+System Squire can check for updates from GitHub inside the app.
+
+- Enable **Auto-check for updates** to check automatically.
+- Enable **Auto-download updates** to download new installers automatically after a successful check.
+- Use **Check** and **Download and Install** in the app's Updates section for manual control.
 
 ## Build From Source
 
@@ -81,17 +87,17 @@ Build script parameters:
 	- Overrides installer version metadata.
 	- If omitted, version is read from the project file (`Version`, then `AssemblyVersion`, then `FileVersion`).
 - `-NoVersionInInstallerName` (switch)
-	- Uses `SystemSquireSetup.exe` instead of a versioned installer filename.
+	- Uses a non-versioned installer filename instead of a versioned filename.
 
 All parameters are also available through `build.bat` and are forwarded to `build.ps1`.
 
 Installer build examples:
 
 ```powershell
-# Default installer name includes version, e.g. SystemSquireSetup-1.1.0.exe
+# Default installer name includes version metadata
 .\build.ps1 -BuildInstaller
 
-# Keep legacy installer name without version suffix
+# Use a non-versioned installer filename
 .\build.ps1 -BuildInstaller -NoVersionInInstallerName
 ```
 

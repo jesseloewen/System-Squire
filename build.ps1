@@ -23,32 +23,6 @@ function Write-Step {
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
-function Get-SystemSquireProcesses {
-    $byName = Get-Process -Name "System Squire", "SystemSquire" -ErrorAction SilentlyContinue
-    return $byName | Sort-Object Id -Unique
-}
-
-function Ensure-AppNotRunning {
-    $runningProcesses = @(Get-SystemSquireProcesses)
-    if ($runningProcesses.Count -eq 0) {
-        return
-    }
-
-    Write-Host "System Squire is currently running:" -ForegroundColor Yellow
-    foreach ($proc in $runningProcesses) {
-        Write-Host (" - {0} (PID {1})" -f $proc.ProcessName, $proc.Id) -ForegroundColor Yellow
-    }
-
-    $answer = Read-Host "Stop running instance(s) and continue build? [Y/n]"
-    if ($answer -match "^(n|no)$") {
-        throw "Build cancelled because the app is running."
-    }
-
-    $runningProcesses | Stop-Process -Force
-    Wait-Process -Id ($runningProcesses | ForEach-Object { $_.Id }) -ErrorAction SilentlyContinue
-    Write-Host "Stopped running instance(s)." -ForegroundColor Green
-}
-
 function Invoke-Dotnet {
     param(
         [string]$Command,
@@ -178,7 +152,8 @@ if ($selfContained -and [string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
 
 try {
     Write-Step "Pre-build checks"
-    Ensure-AppNotRunning
+
+    $resolvedBuildVersion = Get-ResolvedInstallerVersion -ProjectFilePath $projectPath
 
     $projectDirectory = Split-Path -Path $projectPath -Parent
     $targetFramework = Get-ResolvedTargetFramework -ProjectFilePath $projectPath
@@ -206,7 +181,8 @@ try {
     $publishArgs = @(
         $projectPath,
         "--configuration", $Configuration,
-        "--no-restore"
+        "--no-restore",
+        "/p:Version=$resolvedBuildVersion"
     )
 
     if (-not [string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
@@ -223,7 +199,7 @@ try {
     }
 
     $publishMode = if ($selfContained) { "self-contained" } else { "framework-dependent" }
-    Write-Step "Publish ($Configuration, $RuntimeIdentifier, $publishMode)"
+    Write-Step "Publish ($Configuration, $RuntimeIdentifier, $publishMode, version $resolvedBuildVersion)"
     Invoke-Dotnet -Command "publish" -Arguments $publishArgs
 
     Write-Host "Publish complete. Output folder: $publishPath" -ForegroundColor Green
@@ -238,13 +214,12 @@ try {
             throw "Inno Setup compiler (ISCC.exe) was not found. Install Inno Setup 6 or set INNO_SETUP_COMPILER to the full ISCC.exe path."
         }
 
-        $resolvedVersion = Get-ResolvedInstallerVersion -ProjectFilePath $projectPath
-        $installerOutputBaseName = Get-InstallerOutputBaseName -Version $resolvedVersion -UseUnversionedName $NoVersionInInstallerName.IsPresent
+        $installerOutputBaseName = Get-InstallerOutputBaseName -Version $resolvedBuildVersion -UseUnversionedName $NoVersionInInstallerName.IsPresent
 
-        Write-Step "Build installer (Inno Setup, version $resolvedVersion, file $installerOutputBaseName.exe)"
+        Write-Step "Build installer (Inno Setup, version $resolvedBuildVersion, file $installerOutputBaseName.exe)"
         New-Item -ItemType Directory -Path $installerOutputPath -Force | Out-Null
 
-        & $isccPath "/DAppVersion=$resolvedVersion" "/DSourceDir=$publishPath" "/DOutputDir=$installerOutputPath" "/DOutputBaseFilename=$installerOutputBaseName" $installerScriptPath
+        & $isccPath "/DAppVersion=$resolvedBuildVersion" "/DSourceDir=$publishPath" "/DOutputDir=$installerOutputPath" "/DOutputBaseFilename=$installerOutputBaseName" $installerScriptPath
         if ($LASTEXITCODE -ne 0) {
             throw "Installer build failed with exit code $LASTEXITCODE"
         }
