@@ -781,12 +781,6 @@ namespace SystemSquire
             TimeSpan watchDuration = _launchWatchDuration;
             DateTime watchUntil = DateTime.UtcNow.Add(watchDuration);
 
-            var knownProcessIdsByApp = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
-            foreach (string appName in appsToWatch)
-            {
-                knownProcessIdsByApp[appName] = CaptureProcessIds(appName);
-            }
-
             OnStatusChanged($"Watching launch apps for {watchDuration.TotalMinutes:0.#} minute(s)");
 
             try
@@ -799,8 +793,6 @@ namespace SystemSquire
 
                     foreach (string appName in appsToWatch)
                     {
-                        HashSet<int> knownProcessIds = knownProcessIdsByApp[appName];
-
                         foreach (Process process in Process.GetProcessesByName(appName))
                         {
                             try
@@ -810,17 +802,10 @@ namespace SystemSquire
                                     continue;
                                 }
 
-                                if (knownProcessIds.Contains(process.Id))
-                                {
-                                    continue;
-                                }
-
                                 if (process.MainWindowHandle == IntPtr.Zero)
                                 {
                                     continue;
                                 }
-
-                                knownProcessIds.Add(process.Id);
 
                                 detectedAppName = appName;
                                 OnStatusChanged($"Detected window for {appName}; waiting {_launchMinimizeDelay.TotalSeconds:0} second(s) before minimize");
@@ -876,32 +861,6 @@ namespace SystemSquire
             {
                 OnStatusChanged($"Warning: Launch watch error - {ex.Message}");
             }
-        }
-
-        private static HashSet<int> CaptureProcessIds(string processName)
-        {
-            var processIds = new HashSet<int>();
-
-            foreach (Process process in Process.GetProcessesByName(processName))
-            {
-                try
-                {
-                    if (!process.HasExited)
-                    {
-                        processIds.Add(process.Id);
-                    }
-                }
-                catch
-                {
-                    // Ignore inaccessible or terminating processes.
-                }
-                finally
-                {
-                    process.Dispose();
-                }
-            }
-
-            return processIds;
         }
 
         private async Task WatchForAppLifecycleAsync(CancellationToken cancellationToken)

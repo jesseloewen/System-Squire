@@ -573,7 +573,7 @@
 
                                 <Button x:Name="ConfigurePushoverButton"
                                         Grid.Column="0"
-                                        Content="Configure Pushover Notifications"
+                                        Content="Pushover Notifications"
                                         Click="ConfigurePushover_Click"/>
 
                                 <Button x:Name="TestPushoverNotificationButton"
@@ -684,18 +684,25 @@
 
                                 <Button x:Name="StartWebServiceButton"
                                         Grid.Column="0"
-                                        Content="Start Service"
+                                    Grid.ColumnSpan="5"
+                                        Content="Start"
                                         Click="StartWebService_Click"/>
                                 <Button x:Name="StopWebServiceButton"
-                                        Grid.Column="2"
-                                        Content="Stop Service"
+                                    Grid.Column="0"
+                                        Content="Stop"
                                         Background="#A04040"
+                                    Visibility="Collapsed"
                                         Click="StopWebService_Click"/>
                                 <Button x:Name="RestartWebServiceButton"
-                                        Grid.Column="4"
-                                        Content="Restart Service"
+                                    Grid.Column="2"
+                                        Content="Restart"
                                         Background="#8A5A2B"
                                         Click="RestartWebService_Click"/>
+                                <Button x:Name="OpenWebPageButton"
+                                    Grid.Column="4"
+                                        Content="Open"
+                                        Background="#0E639C"
+                                        Click="OpenWebPage_Click"/>
                             </Grid>
                         </StackPanel>
                     </StackPanel>

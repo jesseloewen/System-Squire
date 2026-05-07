@@ -41,7 +41,7 @@ System Squire stores settings in a local `config.json` file in the application d
 
 To enable Pushover notifications:
 
-1. Open **Configure Pushover Notifications**.
+1. Open **Pushover Notifications**.
 2. Enable notifications and enter your App Token and User Key.
 3. Choose the events you want to receive.
 4. Save your settings.

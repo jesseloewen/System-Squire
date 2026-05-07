@@ -1,29 +1,32 @@
-# System Squire v1.2.0
+# System Squire v1.2.1
 
-Smarter updates. Cleaner control. Faster everyday use.
+Sharper web controls. Better visibility. Smoother window behavior.
 
-[Download v1.2.0 Installer](https://github.com/jesseloewen/System-Squire/releases/download/v1.2.0/SystemSquireSetup-1.2.0.exe)  
+[Download v1.2.1 Installer](https://github.com/jesseloewen/System-Squire/releases/download/v1.2.1/SystemSquireSetup-1.2.1.exe)
 
-## Why this is v1.2.0
+## Why this is v1.2.1
 
-This release is a major step forward for System Squire, centered on two big upgrades:
+This release focuses on usability and reliability improvements introduced after v1.2.0:
 
-- Built-in GitHub auto-update support (check, download, and install flow inside the app)
-- A dramatic UI refresh across the main window and configuration experience
+- Better remote web service control and clearer running endpoint feedback
+- Improved tray-to-window restore behavior so the app reliably comes to the front
+- More consistent launch-app monitoring behavior for minimize automation
 
 ## What is new
 
-- New in-app Updates panel with status indicator, auto-check, auto-download, and one-click install controls
-- New GitHub release integration that detects newer versions and downloads installers safely
-- Refreshed main app layout with clearer sections, improved spacing, and upgraded tray menu styling
-- Expanded startup controls: start with Windows and optional auto-open of the remote web page
-- Better shutdown control with configurable countdown seconds
-- Remote control contract updates and web service polish for clearer state/version messaging
-- Build and installer script improvements for consistent versioned installer output
+- Updated web service control row in the main UI with state-based actions
+- Start now appears as a single primary action when stopped
+- Stop/Restart/Open actions are shown when the service is running
+- Added direct Open action in the web service controls for faster access to the remote page
+- Web service status now reports a practical LAN IPv4 endpoint (with port) when available, improving discoverability from other devices
+- Clicking the tray balloon tip now restores the main window
+- Main window foreground activation was strengthened to reduce cases where restore does not surface the window
+- Launch-app watcher logic was simplified for more reliable detection of app windows during monitoring
+- Pushover button naming was streamlined to "Pushover Notifications" in the app and README for consistency
 
 ## Quick summary for users
 
-If you are already using System Squire, v1.2.0 makes updates easier and the app easier to navigate day to day. You can now keep up to date from inside the app and manage key system actions in a cleaner, more polished interface.
+If you are already on System Squire, v1.2.1 makes remote control easier to use day to day and improves window restore reliability when interacting from the tray.
 
 ## Install
 

@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Media;
+using System.Net;
+using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -74,6 +76,7 @@ namespace SystemSquire
             if (_trayIcon != null)
             {
                 _trayIcon.TrayMouseDoubleClick += TrayIcon_TrayMouseDoubleClick;
+                _trayIcon.TrayBalloonTipClicked += TrayIcon_TrayBalloonTipClicked;
             }
 
             LoadConfiguration();
@@ -1478,9 +1481,9 @@ namespace SystemSquire
         private void UpdateWebServiceStatusDisplay(string? overrideMessage = null)
         {
             bool running = _remoteWebService.IsRunning;
-            string message = overrideMessage ?? (running
-                ? $"Web service running at {_remoteWebService.BaseUrl}"
-                : "Web service is stopped.");
+            string message = running
+                ? BuildWebServiceRunningStatusText()
+                : (overrideMessage ?? "Web service is stopped.");
 
             WebServiceStatusText.Text = message;
             WebServiceStatusText.Foreground = running
@@ -1489,8 +1492,72 @@ namespace SystemSquire
 
             StartWebServiceButton.IsEnabled = !running;
             StopWebServiceButton.IsEnabled = running;
+            StartWebServiceButton.Visibility = running ? Visibility.Collapsed : Visibility.Visible;
+            StopWebServiceButton.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
             RestartWebServiceButton.IsEnabled = running;
+            OpenWebPageButton.IsEnabled = running;
+            RestartWebServiceButton.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
+            OpenWebPageButton.Visibility = running ? Visibility.Visible : Visibility.Collapsed;
             UpdateTrayMenuState();
+        }
+
+        private string BuildWebServiceRunningStatusText()
+        {
+            int port = _remoteWebService.Port > 0 ? _remoteWebService.Port : DefaultWebServicePort;
+            string ipv4Address = GetPreferredLanIpv4Address();
+            string endpoint = string.IsNullOrWhiteSpace(ipv4Address)
+                ? $"localhost:{port}"
+                : $"{ipv4Address}:{port}";
+
+            return $"Web service running at {endpoint}";
+        }
+
+        private static string GetPreferredLanIpv4Address()
+        {
+            try
+            {
+                string? firstCandidate = null;
+
+                foreach (IPAddress address in Dns.GetHostAddresses(Dns.GetHostName()))
+                {
+                    if (address.AddressFamily != AddressFamily.InterNetwork || IPAddress.IsLoopback(address))
+                    {
+                        continue;
+                    }
+
+                    string candidate = address.ToString();
+                    if (candidate.StartsWith("169.254.", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    if (IsPrivateIpv4Address(address))
+                    {
+                        return candidate;
+                    }
+
+                    firstCandidate ??= candidate;
+                }
+
+                return firstCandidate ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static bool IsPrivateIpv4Address(IPAddress address)
+        {
+            byte[] bytes = address.GetAddressBytes();
+            if (bytes.Length != 4)
+            {
+                return false;
+            }
+
+            return bytes[0] == 10 ||
+                (bytes[0] == 172 && bytes[1] is >= 16 and <= 31) ||
+                (bytes[0] == 192 && bytes[1] == 168);
         }
 
         private void RestartWebService(bool showFailureDialog)
@@ -1510,7 +1577,7 @@ namespace SystemSquire
 
             if (_remoteWebService.IsRunning && _remoteWebService.Port == port)
             {
-                UpdateWebServiceStatusDisplay($"Web service already running at {_remoteWebService.BaseUrl}");
+                UpdateWebServiceStatusDisplay();
                 if (openWebPage)
                 {
                     OpenWebControlPage();
@@ -1997,6 +2064,11 @@ namespace SystemSquire
             ShowMainWindow();
         }
 
+        private void TrayIcon_TrayBalloonTipClicked(object sender, RoutedEventArgs e)
+        {
+            ShowMainWindow();
+        }
+
         private void TrayContextMenu_Opened(object sender, RoutedEventArgs e)
         {
             UpdateTrayMenuState();
@@ -2097,6 +2169,11 @@ namespace SystemSquire
             this.WindowState = WindowState.Normal;
             this.ShowInTaskbar = true;
             this.Activate();
+
+            // Nudge Z-order so the window reliably comes to the foreground.
+            this.Topmost = true;
+            this.Topmost = false;
+            this.Focus();
         }
 
         private async void MenuItem_Exit_Click(object sender, RoutedEventArgs e)
