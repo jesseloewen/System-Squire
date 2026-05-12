@@ -9,6 +9,11 @@ namespace SystemSquire
         public int ShutdownCountdownSeconds { get; set; } = 10;
         public int LaunchWatchDurationMinutes { get; set; } = 1;
         public int LaunchMinimizeDelaySeconds { get; set; } = 0;
+        public bool BlackoutTurnOffCapsLock { get; set; }
+        public bool BlackoutTurnOffNumLock { get; set; }
+        public bool BlackoutTurnOffScrollLock { get; set; }
+        public bool BlackoutOpenDummyWindow { get; set; }
+        public string DummyWindowPath { get; set; } = string.Empty;
         public List<ConfiguredAppEntry> AppsToKillBeforeShutdown { get; set; } = new();
         public List<ConfiguredAppEntry> AppsToWatchAfterLaunch { get; set; } = new();
         public List<string> RunningApplications { get; set; } = new();
@@ -22,6 +27,10 @@ namespace SystemSquire
         public int ShutdownCountdownSeconds { get; set; } = 10;
         public int LaunchWatchDurationMinutes { get; set; } = 1;
         public int LaunchMinimizeDelaySeconds { get; set; }
+        public bool BlackoutTurnOffCapsLock { get; set; }
+        public bool BlackoutTurnOffNumLock { get; set; }
+        public bool BlackoutTurnOffScrollLock { get; set; }
+        public bool BlackoutOpenDummyWindow { get; set; }
         public List<ConfiguredAppEntry> AppsToKillBeforeShutdown { get; set; } = new();
         public List<ConfiguredAppEntry> AppsToWatchAfterLaunch { get; set; } = new();
         public PushoverConfig? Pushover { get; set; }

@@ -93,6 +93,11 @@ namespace SystemSquire
     public class SystemOperations
     {
         private const string WrappedPowerShellErrorPrefix = "__SYSTEM_SQUIRE_ERROR__";
+        private const string DummyWindowExecutableName = "SystemSquireDummyWindow.exe";
+        private const string DummyWindowProcessName = "SystemSquireDummyWindow";
+        private static readonly TimeSpan BlackoutExitSettleWindow = TimeSpan.FromMilliseconds(700);
+        private const int DummyWindowActivationRetryCount = 10;
+        private const int DummyWindowActivationRetryDelayMs = 100;
         private bool _shutdownActive = false;
         private bool _cooldownActive = false;
         private CancellationTokenSource? _shutdownCts;
@@ -112,11 +117,29 @@ namespace SystemSquire
         private TimeSpan _folderInactivityInterval = TimeSpan.FromMinutes(10);
         private bool _repeatFolderInactivityNotifications = true;
         private CancellationTokenSource? _folderWatchCts;
+        private readonly object _blackoutRestoreSync = new();
+        private readonly object _dummyWindowSync = new();
+        private CancellationTokenSource? _blackoutRestoreCts;
+        private BlackoutLockSnapshot? _pendingBlackoutLockSnapshot;
+        private Process? _dummyWindowProcess;
+        private bool _closeDummyWindowOnBlackoutExit;
 
         private sealed class FileSnapshotInfo
         {
             public DateTime LastWriteUtc { get; set; }
             public long Length { get; set; }
+        }
+
+        private sealed class BlackoutLockSnapshot
+        {
+            public bool? CapsLockWasEnabled { get; set; }
+            public bool? NumLockWasEnabled { get; set; }
+            public bool? ScrollLockWasEnabled { get; set; }
+
+            public bool HasAnySelection =>
+                CapsLockWasEnabled.HasValue ||
+                NumLockWasEnabled.HasValue ||
+                ScrollLockWasEnabled.HasValue;
         }
 
         public event EventHandler<string>? StatusChanged;
@@ -284,6 +307,127 @@ namespace SystemSquire
             _folderWatchCts = null;
         }
 
+        public void StopBlackoutRestoreWatch()
+        {
+            CancellationTokenSource? restoreCts;
+
+            lock (_blackoutRestoreSync)
+            {
+                restoreCts = _blackoutRestoreCts;
+                _blackoutRestoreCts = null;
+                _pendingBlackoutLockSnapshot = null;
+                _closeDummyWindowOnBlackoutExit = false;
+            }
+
+            restoreCts?.Cancel();
+        }
+
+        public bool OpenDummyWindow(out string message)
+        {
+            try
+            {
+                lock (_dummyWindowSync)
+                {
+                    Process? existingProcess = TryGetExistingDummyWindowProcess();
+                    if (existingProcess != null)
+                    {
+                        _dummyWindowProcess = existingProcess;
+                        TryActivateDummyWindow(existingProcess);
+                        message = "Dummy window already open.";
+                        OnStatusChanged(message);
+                        return true;
+                    }
+
+                    string executablePath = ResolveDummyWindowExecutablePath();
+                    if (!File.Exists(executablePath))
+                    {
+                        message = $"Dummy window executable not found: {executablePath}";
+                        OnStatusChanged($"Warning: {message}");
+                        return false;
+                    }
+
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = executablePath,
+                        WorkingDirectory = Path.GetDirectoryName(executablePath) ?? AppContext.BaseDirectory,
+                        CreateNoWindow = false,
+                        UseShellExecute = false
+                    };
+
+                    Process? process = Process.Start(psi);
+                    if (process == null)
+                    {
+                        message = "Dummy window failed to start.";
+                        OnStatusChanged($"Warning: {message}");
+                        return false;
+                    }
+
+                    _dummyWindowProcess = process;
+                    _ = Task.Run(() => TryActivateDummyWindow(process));
+                    message = "Dummy window opened.";
+                    OnStatusChanged(message);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                message = $"Unable to open dummy window: {ex.Message}";
+                OnStatusChanged($"Warning: {message}");
+                return false;
+            }
+        }
+
+        public string GetDummyWindowExecutablePath()
+        {
+            return ResolveDummyWindowExecutablePath();
+        }
+
+        public void CloseDummyWindow(bool suppressStatus = false)
+        {
+            try
+            {
+                var processesToClose = new List<Process>();
+
+                lock (_dummyWindowSync)
+                {
+                    if (_dummyWindowProcess != null)
+                    {
+                        processesToClose.Add(_dummyWindowProcess);
+                        _dummyWindowProcess = null;
+                    }
+                }
+
+                foreach (Process process in Process.GetProcessesByName(DummyWindowProcessName))
+                {
+                    if (processesToClose.Any(candidate => candidate.Id == process.Id))
+                    {
+                        process.Dispose();
+                        continue;
+                    }
+
+                    processesToClose.Add(process);
+                }
+
+                bool closedAny = false;
+                foreach (Process process in processesToClose)
+                {
+                    closedAny |= TryCloseDummyWindowProcess(process);
+                }
+
+                if (closedAny && !suppressStatus)
+                {
+                    OnStatusChanged("Dummy window closed.");
+                }
+            }
+            catch (Exception ex)
+            {
+                if (!suppressStatus)
+                {
+                    OnStatusChanged($"Warning: Unable to close dummy window: {ex.Message}");
+                }
+            }
+        }
+
         public void StartLaunchWatchWindow()
         {
             StopLaunchWatchWindow();
@@ -416,11 +560,35 @@ namespace SystemSquire
             OnStatusChanged("Ready");
         }
 
-        public void TriggerBlackout()
+        public void TriggerBlackout(
+            bool turnOffCapsLock = false,
+            bool turnOffNumLock = false,
+            bool turnOffScrollLock = false,
+            bool openDummyWindow = false)
         {
             try
             {
                 OnStatusChanged("Blackout activated");
+
+                BlackoutLockSnapshot blackoutSnapshot = CreateBlackoutLockSnapshot(
+                    turnOffCapsLock,
+                    turnOffNumLock,
+                    turnOffScrollLock);
+
+                bool closeDummyWindowOnExit = false;
+                if (openDummyWindow)
+                {
+                    closeDummyWindowOnExit = OpenDummyWindow(out _);
+                }
+
+                if (blackoutSnapshot.HasAnySelection)
+                {
+                    TurnOffSelectedLockKeys(blackoutSnapshot);
+                }
+
+                StartBlackoutRestoreWatch(
+                    blackoutSnapshot.HasAnySelection ? blackoutSnapshot : null,
+                    closeDummyWindowOnExit);
                 
                 // Turn off monitors
                 const int SC_MONITORPOWER = 0xF170;
@@ -432,6 +600,297 @@ namespace SystemSquire
             {
                 OnStatusChanged($"Error: {ex.Message}");
             }
+        }
+
+        private void StartBlackoutRestoreWatch(BlackoutLockSnapshot? snapshot, bool closeDummyWindowOnExit)
+        {
+            if (snapshot == null && !closeDummyWindowOnExit)
+            {
+                StopBlackoutRestoreWatch();
+                return;
+            }
+
+            if (!TryGetLastInputTick(out uint baselineInputTick))
+            {
+                StopBlackoutRestoreWatch();
+                return;
+            }
+
+            var restoreCts = new CancellationTokenSource();
+            CancellationTokenSource? previousRestoreCts;
+
+            lock (_blackoutRestoreSync)
+            {
+                previousRestoreCts = _blackoutRestoreCts;
+                _blackoutRestoreCts = restoreCts;
+                _pendingBlackoutLockSnapshot = snapshot;
+                _closeDummyWindowOnBlackoutExit = closeDummyWindowOnExit;
+            }
+
+            previousRestoreCts?.Cancel();
+
+            _ = Task.Run(() => WatchForBlackoutExitAsync(baselineInputTick, restoreCts));
+        }
+
+        private async Task WatchForBlackoutExitAsync(uint baselineInputTick, CancellationTokenSource restoreCts)
+        {
+            try
+            {
+                CancellationToken token = restoreCts.Token;
+
+                await Task.Delay(BlackoutExitSettleWindow, token);
+
+                if (TryGetLastInputTick(out uint postSettleInputTick))
+                {
+                    baselineInputTick = postSettleInputTick;
+                }
+
+                while (!token.IsCancellationRequested)
+                {
+                    if (TryGetLastInputTick(out uint currentInputTick))
+                    {
+                        if (currentInputTick != baselineInputTick)
+                        {
+                            RestoreBlackoutLockSnapshot(restoreCts);
+                            return;
+                        }
+                    }
+
+                    await Task.Delay(200, token);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when a new blackout is triggered or app exits.
+            }
+            catch
+            {
+                // Best effort: lock key restore should never crash the service loop.
+            }
+            finally
+            {
+                restoreCts.Dispose();
+            }
+        }
+
+        private BlackoutLockSnapshot CreateBlackoutLockSnapshot(bool turnOffCapsLock, bool turnOffNumLock, bool turnOffScrollLock)
+        {
+            return new BlackoutLockSnapshot
+            {
+                CapsLockWasEnabled = turnOffCapsLock ? IsLockKeyEnabled(VK_CAPITAL) : null,
+                NumLockWasEnabled = turnOffNumLock ? IsLockKeyEnabled(VK_NUMLOCK) : null,
+                ScrollLockWasEnabled = turnOffScrollLock ? IsLockKeyEnabled(VK_SCROLL) : null
+            };
+        }
+
+        private static void TurnOffSelectedLockKeys(BlackoutLockSnapshot snapshot)
+        {
+            if (snapshot.CapsLockWasEnabled == true)
+            {
+                EnsureLockKeyState(VK_CAPITAL, enabled: false);
+            }
+
+            if (snapshot.NumLockWasEnabled == true)
+            {
+                EnsureLockKeyState(VK_NUMLOCK, enabled: false);
+            }
+
+            if (snapshot.ScrollLockWasEnabled == true)
+            {
+                EnsureLockKeyState(VK_SCROLL, enabled: false);
+            }
+        }
+
+        private void RestoreBlackoutLockSnapshot(CancellationTokenSource restoreCts)
+        {
+            BlackoutLockSnapshot? snapshot;
+            bool closeDummyWindowOnExit;
+
+            lock (_blackoutRestoreSync)
+            {
+                if (!ReferenceEquals(_blackoutRestoreCts, restoreCts))
+                {
+                    return;
+                }
+
+                snapshot = _pendingBlackoutLockSnapshot;
+                _pendingBlackoutLockSnapshot = null;
+                closeDummyWindowOnExit = _closeDummyWindowOnBlackoutExit;
+                _closeDummyWindowOnBlackoutExit = false;
+                _blackoutRestoreCts = null;
+            }
+
+            if (snapshot != null)
+            {
+                if (snapshot.CapsLockWasEnabled.HasValue)
+                {
+                    EnsureLockKeyState(VK_CAPITAL, snapshot.CapsLockWasEnabled.Value);
+                }
+
+                if (snapshot.NumLockWasEnabled.HasValue)
+                {
+                    EnsureLockKeyState(VK_NUMLOCK, snapshot.NumLockWasEnabled.Value);
+                }
+
+                if (snapshot.ScrollLockWasEnabled.HasValue)
+                {
+                    EnsureLockKeyState(VK_SCROLL, snapshot.ScrollLockWasEnabled.Value);
+                }
+            }
+
+            if (closeDummyWindowOnExit)
+            {
+                CloseDummyWindow(suppressStatus: true);
+            }
+        }
+
+        private static string ResolveDummyWindowExecutablePath()
+        {
+            return Path.Combine(AppContext.BaseDirectory, "Tools", DummyWindowExecutableName);
+        }
+
+        private Process? TryGetExistingDummyWindowProcess()
+        {
+            if (_dummyWindowProcess != null)
+            {
+                try
+                {
+                    if (!_dummyWindowProcess.HasExited)
+                    {
+                        return _dummyWindowProcess;
+                    }
+                }
+                catch
+                {
+                    // Ignore stale process handle.
+                }
+
+                _dummyWindowProcess.Dispose();
+                _dummyWindowProcess = null;
+            }
+
+            foreach (Process process in Process.GetProcessesByName(DummyWindowProcessName))
+            {
+                try
+                {
+                    if (!process.HasExited)
+                    {
+                        return process;
+                    }
+                }
+                catch
+                {
+                    // Ignore and continue searching.
+                }
+
+                process.Dispose();
+            }
+
+            return null;
+        }
+
+        private static bool TryCloseDummyWindowProcess(Process process)
+        {
+            try
+            {
+                if (process.HasExited)
+                {
+                    process.Dispose();
+                    return false;
+                }
+
+                bool closeRequested = process.CloseMainWindow();
+                if (closeRequested && process.WaitForExit(1500))
+                {
+                    process.Dispose();
+                    return true;
+                }
+
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(1500);
+                process.Dispose();
+                return true;
+            }
+            catch
+            {
+                try
+                {
+                    process.Dispose();
+                }
+                catch
+                {
+                    // Ignore dispose failures.
+                }
+
+                return false;
+            }
+        }
+
+        private static void TryActivateDummyWindow(Process process)
+        {
+            try
+            {
+                if (process.HasExited)
+                {
+                    return;
+                }
+
+                try
+                {
+                    process.WaitForInputIdle(1500);
+                }
+                catch
+                {
+                    // Some processes may not support WaitForInputIdle.
+                }
+
+                for (int attempt = 0; attempt < DummyWindowActivationRetryCount; attempt++)
+                {
+                    if (process.HasExited)
+                    {
+                        return;
+                    }
+
+                    IntPtr windowHandle = process.MainWindowHandle;
+                    if (windowHandle != IntPtr.Zero)
+                    {
+                        ShowWindowAsync(windowHandle, SW_RESTORE);
+                        SetForegroundWindow(windowHandle);
+                        return;
+                    }
+
+                    Thread.Sleep(DummyWindowActivationRetryDelayMs);
+                }
+            }
+            catch
+            {
+                // Best effort only.
+            }
+        }
+
+        private static void EnsureLockKeyState(byte virtualKey, bool enabled)
+        {
+            if (IsLockKeyEnabled(virtualKey) == enabled)
+            {
+                return;
+            }
+
+            ToggleLockKey(virtualKey);
+        }
+
+        private static bool IsLockKeyEnabled(byte virtualKey)
+        {
+            return (GetKeyState(virtualKey) & 0x0001) != 0;
+        }
+
+        private static void ToggleLockKey(byte virtualKey)
+        {
+            uint downFlags = virtualKey is VK_NUMLOCK or VK_SCROLL
+                ? KEYEVENTF_EXTENDEDKEY
+                : 0;
+
+            keybd_event(virtualKey, LOCK_KEY_SCAN_CODE, downFlags, UIntPtr.Zero);
+            keybd_event(virtualKey, LOCK_KEY_SCAN_CODE, downFlags | KEYEVENTF_KEYUP, UIntPtr.Zero);
         }
 
         public bool TriggerDesktopLock()
@@ -964,6 +1423,21 @@ namespace SystemSquire
         {
             idleDuration = TimeSpan.Zero;
 
+            if (!TryGetLastInputTick(out uint lastInputTick))
+            {
+                return false;
+            }
+
+            uint tickCount = unchecked((uint)Environment.TickCount);
+            uint idleMilliseconds = unchecked(tickCount - lastInputTick);
+            idleDuration = TimeSpan.FromMilliseconds(idleMilliseconds);
+            return true;
+        }
+
+        private static bool TryGetLastInputTick(out uint inputTick)
+        {
+            inputTick = 0;
+
             var lastInputInfo = new LASTINPUTINFO
             {
                 cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>()
@@ -974,9 +1448,7 @@ namespace SystemSquire
                 return false;
             }
 
-            uint tickCount = unchecked((uint)Environment.TickCount);
-            uint idleMilliseconds = unchecked(tickCount - lastInputInfo.dwTime);
-            idleDuration = TimeSpan.FromMilliseconds(idleMilliseconds);
+            inputTick = lastInputInfo.dwTime;
             return true;
         }
 
@@ -1271,6 +1743,13 @@ namespace SystemSquire
         #region Native Methods
         private const int HWND_BROADCAST = 0xFFFF;
         private const int WM_SYSCOMMAND = 0x0112;
+        private const byte VK_CAPITAL = 0x14;
+        private const byte VK_NUMLOCK = 0x90;
+        private const byte VK_SCROLL = 0x91;
+        private const byte LOCK_KEY_SCAN_CODE = 0x45;
+        private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
+        private const uint KEYEVENTF_KEYUP = 0x0002;
+        private const int SW_RESTORE = 9;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct LASTINPUTINFO
@@ -1287,6 +1766,18 @@ namespace SystemSquire
 
         [DllImport("user32.dll")]
         private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+        [DllImport("user32.dll")]
+        private static extern short GetKeyState(int nVirtKey);
+
+        [DllImport("user32.dll")]
+        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
         #endregion
     }
 }

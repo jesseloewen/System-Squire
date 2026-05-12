@@ -217,6 +217,10 @@ namespace SystemSquire
     {
         public string ShutdownHotkey { get; set; } = "Ctrl+Alt+F8";
         public string BlackoutHotkey { get; set; } = "Ctrl+Alt+F7";
+        public bool BlackoutTurnOffCapsLock { get; set; } = false;
+        public bool BlackoutTurnOffNumLock { get; set; } = false;
+        public bool BlackoutTurnOffScrollLock { get; set; } = false;
+        public bool BlackoutOpenDummyWindow { get; set; } = false;
         public int ShutdownCountdownSeconds { get; set; } = 10;
         public bool StartAtSystemStartup { get; set; } = false;
         public bool StartMinimized { get; set; } = false;

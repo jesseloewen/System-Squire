@@ -14,6 +14,7 @@ $ErrorActionPreference = "Stop"
 $projectRoot = $PSScriptRoot
 $solutionPath = Join-Path $projectRoot "SystemSquire.sln"
 $projectPath = Join-Path $projectRoot "SystemSquire\SystemSquire.csproj"
+$dummyProjectPath = Join-Path $projectRoot "SystemSquireDummyWindow\SystemSquireDummyWindow.csproj"
 $installerScriptPath = Join-Path $projectRoot "installer\SystemSquire.iss"
 $installerOutputPath = Join-Path $projectRoot "installer\output"
 $selfContained = -not $FrameworkDependent
@@ -146,6 +147,10 @@ if (-not (Test-Path $projectPath)) {
     throw "Project not found at $projectPath"
 }
 
+if (-not (Test-Path $dummyProjectPath)) {
+    throw "Dummy window project not found at $dummyProjectPath"
+}
+
 if ($selfContained -and [string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
     throw "RuntimeIdentifier is required for self-contained publish."
 }
@@ -201,6 +206,38 @@ try {
     $publishMode = if ($selfContained) { "self-contained" } else { "framework-dependent" }
     Write-Step "Publish ($Configuration, $RuntimeIdentifier, $publishMode, version $resolvedBuildVersion)"
     Invoke-Dotnet -Command "publish" -Arguments $publishArgs
+
+    $dummyPublishPath = Join-Path $publishRootPath "_dummy-window"
+    if (Test-Path $dummyPublishPath) {
+        Remove-Item $dummyPublishPath -Recurse -Force
+    }
+
+    $dummyPublishArgs = @(
+        $dummyProjectPath,
+        "--configuration", $Configuration,
+        "--no-restore",
+        "/p:Version=$resolvedBuildVersion",
+        "--runtime", $RuntimeIdentifier,
+        "--self-contained", "true",
+        "-p:PublishSingleFile=true",
+        "-p:PublishTrimmed=false",
+        "--output", $dummyPublishPath
+    )
+
+    Write-Step "Publish dummy blackout window executable"
+    Invoke-Dotnet -Command "publish" -Arguments $dummyPublishArgs
+
+    $dummySourcePath = Join-Path $dummyPublishPath "SystemSquireDummyWindow.exe"
+    if (-not (Test-Path $dummySourcePath)) {
+        throw "Dummy window executable was not produced at $dummySourcePath"
+    }
+
+    $toolsOutputPath = Join-Path $publishPath "Tools"
+    New-Item -ItemType Directory -Path $toolsOutputPath -Force | Out-Null
+    $dummyDestinationPath = Join-Path $toolsOutputPath "SystemSquireDummyWindow.exe"
+    Copy-Item -Path $dummySourcePath -Destination $dummyDestinationPath -Force
+
+    Remove-Item $dummyPublishPath -Recurse -Force
 
     Write-Host "Publish complete. Output folder: $publishPath" -ForegroundColor Green
 

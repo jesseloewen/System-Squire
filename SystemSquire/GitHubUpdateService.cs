@@ -26,9 +26,12 @@ namespace SystemSquire
     {
         public bool Success { get; init; }
         public bool UpdateAvailable { get; init; }
+        public bool NewerPreReleaseAvailable { get; init; }
+        public bool CurrentVersionAheadOfGitHub { get; init; }
         public string Message { get; init; } = string.Empty;
         public string CurrentVersionText { get; init; } = string.Empty;
         public string LatestVersionText { get; init; } = string.Empty;
+        public string PreReleaseVersionText { get; init; } = string.Empty;
         public UpdateReleaseInfo? LatestRelease { get; init; }
     }
 
@@ -48,11 +51,11 @@ namespace SystemSquire
 
         private static readonly HttpClient HttpClient = CreateHttpClient();
 
-        private readonly string _latestReleaseApiUrl;
+        private readonly string _releasesApiUrl;
 
         public GitHubUpdateService(string owner, string repo)
         {
-            _latestReleaseApiUrl = $"https://api.github.com/repos/{owner}/{repo}/releases/latest";
+            _releasesApiUrl = $"https://api.github.com/repos/{owner}/{repo}/releases?per_page=20";
         }
 
         public string UpdateDirectoryPath => Path.Combine(
@@ -74,7 +77,7 @@ namespace SystemSquire
 
             try
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get, _latestReleaseApiUrl);
+                using var request = new HttpRequestMessage(HttpMethod.Get, _releasesApiUrl);
                 request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
 
                 using HttpResponseMessage response = await HttpClient
@@ -104,11 +107,33 @@ namespace SystemSquire
                 await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken)
                     .ConfigureAwait(false);
 
-                GitHubReleasePayload? payload = await JsonSerializer
-                    .DeserializeAsync<GitHubReleasePayload>(stream, JsonOptions, cancellationToken)
+                List<GitHubReleasePayload>? releases = await JsonSerializer
+                    .DeserializeAsync<List<GitHubReleasePayload>>(stream, JsonOptions, cancellationToken)
                     .ConfigureAwait(false);
 
-                if (payload == null || string.IsNullOrWhiteSpace(payload.TagName))
+                if (releases == null || releases.Count == 0)
+                {
+                    return new UpdateCheckResult
+                    {
+                        Success = false,
+                        Message = "GitHub release payload is empty.",
+                        CurrentVersionText = normalizedCurrentVersion
+                    };
+                }
+
+                GitHubReleasePayload? latestStablePayload = releases
+                    .FirstOrDefault(release =>
+                        !release.Draft &&
+                        !release.PreRelease &&
+                        !string.IsNullOrWhiteSpace(release.TagName));
+
+                GitHubReleasePayload? latestPreReleasePayload = releases
+                    .FirstOrDefault(release =>
+                        !release.Draft &&
+                        release.PreRelease &&
+                        !string.IsNullOrWhiteSpace(release.TagName));
+
+                if (latestStablePayload == null && latestPreReleasePayload == null)
                 {
                     return new UpdateCheckResult
                     {
@@ -118,39 +143,70 @@ namespace SystemSquire
                     };
                 }
 
-                if (!TryParseVersion(payload.TagName, out Version latestVersion, out string normalizedLatestVersion))
+                Version latestStableVersion = currentVersion;
+                string normalizedLatestStableVersion = normalizedCurrentVersion;
+
+                if (latestStablePayload != null &&
+                    !TryParseVersion(latestStablePayload.TagName!, out latestStableVersion, out normalizedLatestStableVersion))
                 {
                     return new UpdateCheckResult
                     {
                         Success = false,
-                        Message = $"GitHub tag '{payload.TagName}' is not a supported version format.",
+                        Message = $"GitHub tag '{latestStablePayload.TagName}' is not a supported version format.",
                         CurrentVersionText = normalizedCurrentVersion
                     };
                 }
 
-                bool updateAvailable = latestVersion > currentVersion;
+                bool newerPreReleaseAvailable = false;
+                string normalizedPreReleaseVersion = string.Empty;
+                Version? latestPreReleaseVersion = null;
+
+                if (latestPreReleasePayload != null &&
+                    TryParseVersion(latestPreReleasePayload.TagName!, out Version preReleaseVersion, out normalizedPreReleaseVersion))
+                {
+                    latestPreReleaseVersion = preReleaseVersion;
+                    if (preReleaseVersion > currentVersion)
+                    {
+                        newerPreReleaseAvailable = true;
+                    }
+                }
+
+                Version latestKnownGitHubVersion = latestStableVersion;
+                if (latestPreReleaseVersion != null && latestPreReleaseVersion > latestKnownGitHubVersion)
+                {
+                    latestKnownGitHubVersion = latestPreReleaseVersion;
+                }
+
+                bool currentVersionAheadOfGitHub = currentVersion > latestKnownGitHubVersion;
+
+                bool updateAvailable = latestStableVersion > currentVersion;
                 if (!updateAvailable)
                 {
                     return new UpdateCheckResult
                     {
                         Success = true,
                         UpdateAvailable = false,
-                        Message = $"System Squire is up to date (v{normalizedCurrentVersion}).",
+                        NewerPreReleaseAvailable = newerPreReleaseAvailable,
+                        CurrentVersionAheadOfGitHub = currentVersionAheadOfGitHub,
+                        Message = currentVersionAheadOfGitHub
+                            ? $"System Squire pre-release build detected (v{normalizedCurrentVersion})."
+                            : $"System Squire is up to date (v{normalizedCurrentVersion}).",
                         CurrentVersionText = normalizedCurrentVersion,
-                        LatestVersionText = normalizedLatestVersion
+                        LatestVersionText = normalizedLatestStableVersion,
+                        PreReleaseVersionText = normalizedPreReleaseVersion
                     };
                 }
 
-                GitHubAssetPayload? asset = SelectInstallerAsset(payload.Assets, normalizedLatestVersion);
+                GitHubAssetPayload? asset = SelectInstallerAsset(latestStablePayload!.Assets, normalizedLatestStableVersion);
                 if (asset == null)
                 {
                     return new UpdateCheckResult
                     {
                         Success = false,
                         UpdateAvailable = true,
-                        Message = $"Update v{normalizedLatestVersion} found, but no installer asset is available.",
+                        Message = $"Update v{normalizedLatestStableVersion} found, but no installer asset is available.",
                         CurrentVersionText = normalizedCurrentVersion,
-                        LatestVersionText = normalizedLatestVersion
+                        LatestVersionText = normalizedLatestStableVersion
                     };
                 }
 
@@ -158,14 +214,14 @@ namespace SystemSquire
                 {
                     Success = true,
                     UpdateAvailable = true,
-                    Message = $"Update available: v{normalizedLatestVersion}.",
+                    Message = $"Update available: v{normalizedLatestStableVersion}.",
                     CurrentVersionText = normalizedCurrentVersion,
-                    LatestVersionText = normalizedLatestVersion,
+                    LatestVersionText = normalizedLatestStableVersion,
                     LatestRelease = new UpdateReleaseInfo
                     {
-                        TagName = payload.TagName,
-                        VersionText = normalizedLatestVersion,
-                        ParsedVersion = latestVersion,
+                        TagName = latestStablePayload.TagName ?? string.Empty,
+                        VersionText = normalizedLatestStableVersion,
+                        ParsedVersion = latestStableVersion,
                         AssetName = asset.Name ?? string.Empty,
                         DownloadUrl = asset.BrowserDownloadUrl ?? string.Empty
                     }
@@ -584,6 +640,12 @@ namespace SystemSquire
         {
             [JsonPropertyName("tag_name")]
             public string? TagName { get; set; }
+
+            [JsonPropertyName("prerelease")]
+            public bool PreRelease { get; set; }
+
+            [JsonPropertyName("draft")]
+            public bool Draft { get; set; }
 
             [JsonPropertyName("assets")]
             public List<GitHubAssetPayload> Assets { get; set; } = new();

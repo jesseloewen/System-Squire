@@ -1,32 +1,32 @@
-# System Squire v1.2.1
+# System Squire v1.2.2
 
-Sharper web controls. Better visibility. Smoother window behavior.
+Smarter blackout controls. New dummy window support. Better update awareness.
 
-[Download v1.2.1 Installer](https://github.com/jesseloewen/System-Squire/releases/download/v1.2.1/SystemSquireSetup-1.2.1.exe)
+[Download v1.2.2 Installer](https://github.com/jesseloewen/System-Squire/releases/download/v1.2.2/SystemSquireSetup-1.2.2.exe)
 
-## Why this is v1.2.1
+## Why this is v1.2.2
 
-This release focuses on usability and reliability improvements introduced after v1.2.0:
+This release focuses on blackout reliability, remote control flexibility, and update flow improvements after v1.2.1:
 
-- Better remote web service control and clearer running endpoint feedback
-- Improved tray-to-window restore behavior so the app reliably comes to the front
-- More consistent launch-app monitoring behavior for minimize automation
+- Added finer blackout behavior controls for keyboard lock keys
+- Introduced a dedicated dummy window tool for blackout-related workflows
+- Improved update detection and install flow behavior in the main UI
 
 ## What is new
 
-- Updated web service control row in the main UI with state-based actions
-- Start now appears as a single primary action when stopped
-- Stop/Restart/Open actions are shown when the service is running
-- Added direct Open action in the web service controls for faster access to the remote page
-- Web service status now reports a practical LAN IPv4 endpoint (with port) when available, improving discoverability from other devices
-- Clicking the tray balloon tip now restores the main window
-- Main window foreground activation was strengthened to reduce cases where restore does not surface the window
-- Launch-app watcher logic was simplified for more reliable detection of app windows during monitoring
-- Pushover button naming was streamlined to "Pushover Notifications" in the app and README for consistency
+- Added blackout options to automatically turn off Caps Lock, Num Lock, and Scroll Lock when blackout is triggered
+- Added an option to open a dedicated dummy window during blackout scenarios
+- Added remote web API support to open the dummy window directly
+- Added main window controls to open the dummy window and copy its executable path
+- Strengthened blackout trigger handling through UI-dispatch-safe execution paths
+- Improved cleanup on shutdown to stop blackout restore watchers and close dummy windows more reliably
+- Improved GitHub release checks to consider a broader release set and better handle stable versus pre-release version states
+- Improved update button behavior so Check, Download, and Install actions reflect the current update state more clearly
+- Added a new SystemSquireDummyWindow project and included its built executable in the packaged Tools folder
 
 ## Quick summary for users
 
-If you are already on System Squire, v1.2.1 makes remote control easier to use day to day and improves window restore reliability when interacting from the tray.
+If you are already on System Squire, v1.2.2 gives you more control over blackout behavior, adds new remote and UI support for a dummy window tool, and makes update handling clearer and more reliable.
 
 ## Install
 

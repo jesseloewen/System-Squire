@@ -61,6 +61,7 @@ namespace SystemSquire
                 TriggerBlackoutFromRemoteAsync,
                 TriggerLockDesktopFromRemoteAsync,
                 TriggerPushoverTestFromRemoteAsync,
+                TriggerDummyWindowOpenFromRemoteAsync,
                 SaveRemoteConfigAsync,
                 GetRemoteWebAuthSettings,
                 VerifyRemoteWebPassword);
@@ -201,6 +202,10 @@ namespace SystemSquire
         {
             ShutdownHotkeyBox.Text = _configManager.Config.ShutdownHotkey;
             BlackoutHotkeyBox.Text = _configManager.Config.BlackoutHotkey;
+            BlackoutTurnOffCapsLockCheckBox.IsChecked = _configManager.Config.BlackoutTurnOffCapsLock;
+            BlackoutTurnOffNumLockCheckBox.IsChecked = _configManager.Config.BlackoutTurnOffNumLock;
+            BlackoutTurnOffScrollLockCheckBox.IsChecked = _configManager.Config.BlackoutTurnOffScrollLock;
+            BlackoutOpenDummyWindowCheckBox.IsChecked = _configManager.Config.BlackoutOpenDummyWindow;
             ShutdownCountdownSecondsBox.Text = _configManager.Config.ShutdownCountdownSeconds.ToString();
             StartAtSystemStartupCheckBox.IsChecked = _configManager.Config.StartAtSystemStartup;
             StartMinimizedCheckBox.IsChecked = _configManager.Config.StartMinimized;
@@ -328,28 +333,22 @@ namespace SystemSquire
         {
             bool isBusy = _isCheckingForUpdates || _isDownloadingUpdate || _isResettingSettings;
             string? downloadedInstallerPath = GetDownloadedInstallerPathForLatestUpdate();
+            bool hasUpdate = _latestAvailableUpdate != null;
+            bool isInstallerReady = hasUpdate && !string.IsNullOrWhiteSpace(downloadedInstallerPath);
 
             CheckForUpdatesButton.IsEnabled = !isBusy;
             DownloadAndInstallUpdateButton.IsEnabled =
                 !isBusy &&
-                _latestAvailableUpdate != null;
+                hasUpdate;
+            DownloadAndInstallUpdateButton.Visibility = hasUpdate
+                ? Visibility.Visible
+                : Visibility.Collapsed;
             AutoCheckForUpdatesCheckBox.IsEnabled = !isBusy;
             AutoDownloadUpdatesCheckBox.IsEnabled = !isBusy;
             ResetAllSettingsButton.IsEnabled = !isBusy;
 
             CheckForUpdatesButton.Content = _isCheckingForUpdates ? "Checking..." : "Check";
-            if (_isDownloadingUpdate)
-            {
-                DownloadAndInstallUpdateButton.Content = "Downloading...";
-            }
-            else if (_latestAvailableUpdate != null && !string.IsNullOrWhiteSpace(downloadedInstallerPath))
-            {
-                DownloadAndInstallUpdateButton.Content = "Install Update";
-            }
-            else
-            {
-                DownloadAndInstallUpdateButton.Content = "Download and Install";
-            }
+            DownloadAndInstallUpdateButton.Content = isInstallerReady ? "Install" : "Download";
 
             ResetAllSettingsButton.Content = _isResettingSettings
                 ? "Resetting..."
@@ -452,6 +451,32 @@ namespace SystemSquire
                 }
 
                 _latestAvailableUpdate = null;
+                if (result.CurrentVersionAheadOfGitHub)
+                {
+                    string preReleaseVersion = string.IsNullOrWhiteSpace(result.CurrentVersionText)
+                        ? BuildVersion.Display
+                        : result.CurrentVersionText;
+
+                    SetUpdateStatus(
+                        $"Pre-release (v{preReleaseVersion})",
+                        Color.FromRgb(14, 99, 156),
+                        Color.FromRgb(184, 220, 245));
+                    return;
+                }
+
+                if (result.NewerPreReleaseAvailable)
+                {
+                    string preReleaseVersion = string.IsNullOrWhiteSpace(result.PreReleaseVersionText)
+                        ? "unknown"
+                        : result.PreReleaseVersionText;
+
+                    SetUpdateStatus(
+                        $"Up to date (pre-release v{preReleaseVersion} available)",
+                        Color.FromRgb(14, 99, 156),
+                        Color.FromRgb(184, 220, 245));
+                    return;
+                }
+
                 string displayVersion = string.IsNullOrWhiteSpace(result.CurrentVersionText)
                     ? BuildVersion.Display
                     : result.CurrentVersionText;
@@ -512,9 +537,10 @@ namespace SystemSquire
 
             try
             {
-                string? installerPath = await DownloadLatestUpdateAsync(triggeredByUser: true);
-                if (string.IsNullOrWhiteSpace(installerPath))
+                string? existingInstallerPath = GetDownloadedInstallerPathForLatestUpdate();
+                if (string.IsNullOrWhiteSpace(existingInstallerPath))
                 {
+                    await DownloadLatestUpdateAsync(triggeredByUser: true);
                     return;
                 }
 
@@ -529,7 +555,7 @@ namespace SystemSquire
                     return;
                 }
 
-                if (!TryLaunchInstaller(installerPath, out string launchError))
+                if (!TryLaunchInstaller(existingInstallerPath, out string launchError))
                 {
                     SetUpdateStatus(
                         launchError,
@@ -857,7 +883,7 @@ namespace SystemSquire
                 _keyboardHook.RegisterHotkey(
                     blackoutHotkey.Value.Modifiers,
                     blackoutHotkey.Value.Key,
-                    () => _systemOps.TriggerBlackout()
+                    () => Dispatcher.BeginInvoke(new Action(TriggerBlackout))
                 );
             }
         }
@@ -1436,7 +1462,59 @@ namespace SystemSquire
 
         private void ToggleBlackoutButton_Click(object sender, RoutedEventArgs e)
         {
-            _systemOps.TriggerBlackout();
+            TriggerBlackout();
+        }
+
+        private void TriggerBlackout()
+        {
+            _systemOps.TriggerBlackout(
+                BlackoutTurnOffCapsLockCheckBox.IsChecked == true,
+                BlackoutTurnOffNumLockCheckBox.IsChecked == true,
+                BlackoutTurnOffScrollLockCheckBox.IsChecked == true,
+                BlackoutOpenDummyWindowCheckBox.IsChecked == true);
+        }
+
+        private void OpenDummyWindowButton_Click(object sender, RoutedEventArgs e)
+        {
+            TryOpenDummyWindow(showFailureDialog: true, out _);
+        }
+
+        private void CopyDummyWindowPathButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string path = _systemOps.GetDummyWindowExecutablePath();
+                Clipboard.SetText(path);
+
+                MessageBox.Show(
+                    $"Dummy window path copied:\n{path}",
+                    "System Squire",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Unable to copy dummy window path: {ex.Message}",
+                    "System Squire",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
+        private bool TryOpenDummyWindow(bool showFailureDialog, out string message)
+        {
+            bool success = _systemOps.OpenDummyWindow(out message);
+            if (!success && showFailureDialog)
+            {
+                MessageBox.Show(
+                    message,
+                    "System Squire",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+
+            return success;
         }
 
         private void StartWebService_Click(object sender, RoutedEventArgs e)
@@ -1683,6 +1761,11 @@ namespace SystemSquire
                 ShutdownCountdownSeconds = GetShutdownCountdownSeconds(),
                 LaunchWatchDurationMinutes = GetLaunchWatchDurationMinutes(),
                 LaunchMinimizeDelaySeconds = GetLaunchMinimizeDelaySeconds(),
+                BlackoutTurnOffCapsLock = _configManager.Config.BlackoutTurnOffCapsLock,
+                BlackoutTurnOffNumLock = _configManager.Config.BlackoutTurnOffNumLock,
+                BlackoutTurnOffScrollLock = _configManager.Config.BlackoutTurnOffScrollLock,
+                BlackoutOpenDummyWindow = _configManager.Config.BlackoutOpenDummyWindow,
+                DummyWindowPath = _systemOps.GetDummyWindowExecutablePath(),
                 AppsToKillBeforeShutdown = GetConfiguredAppEntries(AppsToKillListBox),
                 AppsToWatchAfterLaunch = GetConfiguredAppEntries(AppsToWatchAtLaunchListBox),
                 RunningApplications = GetRunningApplications(),
@@ -1726,7 +1809,7 @@ namespace SystemSquire
 
         private async Task<RemoteOperationResponse> TriggerBlackoutFromRemoteAsync()
         {
-            await InvokeOnUiThreadAsync(() => _systemOps.TriggerBlackout());
+            await InvokeOnUiThreadAsync(() => TriggerBlackout());
 
             return new RemoteOperationResponse
             {
@@ -1764,6 +1847,24 @@ namespace SystemSquire
             };
         }
 
+        private async Task<RemoteOperationResponse> TriggerDummyWindowOpenFromRemoteAsync()
+        {
+            bool success = false;
+            string message = "Failed to open dummy window.";
+
+            await InvokeOnUiThreadAsync(() =>
+            {
+                success = TryOpenDummyWindow(showFailureDialog: false, out message);
+            });
+
+            return new RemoteOperationResponse
+            {
+                Success = success,
+                Message = message,
+                State = await GetRemoteControlStateAsync()
+            };
+        }
+
         private async Task<RemoteOperationResponse> SaveRemoteConfigAsync(RemoteConfigUpdateRequest request)
         {
             await InvokeOnUiThreadAsync(() =>
@@ -1790,6 +1891,10 @@ namespace SystemSquire
                 MaxShutdownCountdownSeconds).ToString();
             LaunchWatchDurationBox.Text = Math.Max(1, request.LaunchWatchDurationMinutes).ToString();
             LaunchMinimizeDelayBox.Text = Math.Max(0, request.LaunchMinimizeDelaySeconds).ToString();
+            BlackoutTurnOffCapsLockCheckBox.IsChecked = request.BlackoutTurnOffCapsLock;
+            BlackoutTurnOffNumLockCheckBox.IsChecked = request.BlackoutTurnOffNumLock;
+            BlackoutTurnOffScrollLockCheckBox.IsChecked = request.BlackoutTurnOffScrollLock;
+            BlackoutOpenDummyWindowCheckBox.IsChecked = request.BlackoutOpenDummyWindow;
 
             PopulateConfiguredAppsList(
                 AppsToKillListBox,
@@ -1919,6 +2024,10 @@ namespace SystemSquire
 
             _configManager.Config.ShutdownHotkey = ShutdownHotkeyBox.Text;
             _configManager.Config.BlackoutHotkey = BlackoutHotkeyBox.Text;
+            _configManager.Config.BlackoutTurnOffCapsLock = BlackoutTurnOffCapsLockCheckBox.IsChecked == true;
+            _configManager.Config.BlackoutTurnOffNumLock = BlackoutTurnOffNumLockCheckBox.IsChecked == true;
+            _configManager.Config.BlackoutTurnOffScrollLock = BlackoutTurnOffScrollLockCheckBox.IsChecked == true;
+            _configManager.Config.BlackoutOpenDummyWindow = BlackoutOpenDummyWindowCheckBox.IsChecked == true;
             _configManager.Config.StartAtSystemStartup = StartAtSystemStartupCheckBox.IsChecked == true;
             _configManager.Config.StartMinimized = StartMinimizedCheckBox.IsChecked ?? false;
             _configManager.Config.WebServicePort = GetWebServicePort();
@@ -2081,7 +2190,7 @@ namespace SystemSquire
 
         private void MenuItem_Blackout_Click(object sender, RoutedEventArgs e)
         {
-            _systemOps.TriggerBlackout();
+            TriggerBlackout();
         }
 
         private async void MenuItem_ToggleWol_Click(object sender, RoutedEventArgs e)
@@ -2209,6 +2318,8 @@ namespace SystemSquire
             _systemOps.StopAppLifecycleWatch();
             _systemOps.StopInactivityWatch();
             _systemOps.StopFolderWatch();
+            _systemOps.StopBlackoutRestoreWatch();
+            _systemOps.CloseDummyWindow(suppressStatus: true);
             _remoteWebService.Stop();
             _keyboardHook.Dispose();
             _trayIcon?.Dispose();
@@ -2221,6 +2332,8 @@ namespace SystemSquire
             _systemOps.StopAppLifecycleWatch();
             _systemOps.StopInactivityWatch();
             _systemOps.StopFolderWatch();
+            _systemOps.StopBlackoutRestoreWatch();
+            _systemOps.CloseDummyWindow(suppressStatus: true);
             _remoteWebService.Stop();
             _keyboardHook.Dispose();
             _trayIcon?.Dispose();

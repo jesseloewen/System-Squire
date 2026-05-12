@@ -28,6 +28,7 @@ namespace SystemSquire
         private readonly Func<Task<RemoteOperationResponse>> _triggerBlackoutAsync;
         private readonly Func<Task<RemoteOperationResponse>> _triggerLockDesktopAsync;
         private readonly Func<Task<RemoteOperationResponse>> _triggerPushoverTestAsync;
+        private readonly Func<Task<RemoteOperationResponse>> _triggerDummyWindowOpenAsync;
         private readonly Func<RemoteConfigUpdateRequest, Task<RemoteOperationResponse>> _saveConfigAsync;
         private readonly Func<RemoteWebAuthSettings> _getWebAuthSettings;
         private readonly Func<string, bool> _verifyWebPassword;
@@ -64,6 +65,7 @@ namespace SystemSquire
             Func<Task<RemoteOperationResponse>> triggerBlackoutAsync,
             Func<Task<RemoteOperationResponse>> triggerLockDesktopAsync,
             Func<Task<RemoteOperationResponse>> triggerPushoverTestAsync,
+            Func<Task<RemoteOperationResponse>> triggerDummyWindowOpenAsync,
             Func<RemoteConfigUpdateRequest, Task<RemoteOperationResponse>> saveConfigAsync,
             Func<RemoteWebAuthSettings> getWebAuthSettings,
             Func<string, bool> verifyWebPassword)
@@ -73,6 +75,7 @@ namespace SystemSquire
             _triggerBlackoutAsync = triggerBlackoutAsync;
             _triggerLockDesktopAsync = triggerLockDesktopAsync;
             _triggerPushoverTestAsync = triggerPushoverTestAsync;
+            _triggerDummyWindowOpenAsync = triggerDummyWindowOpenAsync;
             _saveConfigAsync = saveConfigAsync;
             _getWebAuthSettings = getWebAuthSettings;
             _verifyWebPassword = verifyWebPassword;
@@ -715,6 +718,13 @@ namespace SystemSquire
                     return;
                 }
 
+                if (method == "POST" && path.Equals("/api/action/dummy-window-open", StringComparison.OrdinalIgnoreCase))
+                {
+                    RemoteOperationResponse response = await _triggerDummyWindowOpenAsync().ConfigureAwait(false);
+                    await WriteJsonAsync(context, response.Success ? 200 : 400, response).ConfigureAwait(false);
+                    return;
+                }
+
                 if (method == "POST" && path.Equals("/api/config/save", StringComparison.OrdinalIgnoreCase))
                 {
                     RemoteConfigUpdateRequest? request = await ReadJsonRequestAsync<RemoteConfigUpdateRequest>(context.Request)
@@ -1348,6 +1358,21 @@ namespace SystemSquire
             color: var(--text);
         }
 
+        .check-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 10px;
+            color: var(--text);
+            flex-wrap: wrap;
+        }
+
+        .check-row > label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
         .list {
             margin-top: 10px;
             border: 1px solid var(--border);
@@ -1493,6 +1518,32 @@ namespace SystemSquire
                             <label for="minimizeDelay">Delay Before Minimize (sec)</label>
                             <input id="minimizeDelay" type="number" min="0" />
                         </div>
+                    </div>
+
+                    <div class="check-row">
+                        <span>Blackout keys:</span>
+                        <label for="blackoutTurnOffCapsLock">
+                            <input id="blackoutTurnOffCapsLock" type="checkbox" />
+                            <span>Caps</span>
+                        </label>
+                        <label for="blackoutTurnOffNumLock">
+                            <input id="blackoutTurnOffNumLock" type="checkbox" />
+                            <span>Num</span>
+                        </label>
+                        <label for="blackoutTurnOffScrollLock">
+                            <input id="blackoutTurnOffScrollLock" type="checkbox" />
+                            <span>Scroll</span>
+                        </label>
+                    </div>
+
+                    <div class="check-row">
+                        <span>Dummy:</span>
+                        <label for="blackoutOpenDummyWindow">
+                            <input id="blackoutOpenDummyWindow" type="checkbox" />
+                            <span>Open on blackout</span>
+                        </label>
+                        <button id="openDummyWindowBtn" class="secondary" type="button">Open Dummy</button>
+                        <button id="copyDummyWindowPathBtn" class="secondary" type="button">Copy Path</button>
                     </div>
                 </div>
             </details>
@@ -2092,6 +2143,10 @@ namespace SystemSquire
                 shutdownCountdownSeconds: Number(document.getElementById("shutdownCountdown").value || 10),
                 launchWatchDurationMinutes: Number(document.getElementById("watchDuration").value || 1),
                 launchMinimizeDelaySeconds: Number(document.getElementById("minimizeDelay").value || 0),
+                blackoutTurnOffCapsLock: document.getElementById("blackoutTurnOffCapsLock").checked,
+                blackoutTurnOffNumLock: document.getElementById("blackoutTurnOffNumLock").checked,
+                blackoutTurnOffScrollLock: document.getElementById("blackoutTurnOffScrollLock").checked,
+                blackoutOpenDummyWindow: document.getElementById("blackoutOpenDummyWindow").checked,
                 appsToKillBeforeShutdown: collectEntries("killAppsList"),
                 appsToWatchAfterLaunch: collectEntries("watchAppsList"),
                 pushover: {
@@ -2150,6 +2205,10 @@ namespace SystemSquire
                 "shutdownCountdown",
                 "watchDuration",
                 "minimizeDelay",
+                "blackoutTurnOffCapsLock",
+                "blackoutTurnOffNumLock",
+                "blackoutTurnOffScrollLock",
+                "blackoutOpenDummyWindow",
                 "pushoverEnabled",
                 "notifyOnSystemSquireStart",
                 "notifyOnSystemSquireClose",
@@ -2188,6 +2247,10 @@ namespace SystemSquire
                 : 10;
             document.getElementById("watchDuration").value = state.launchWatchDurationMinutes || 1;
             document.getElementById("minimizeDelay").value = state.launchMinimizeDelaySeconds || 0;
+            document.getElementById("blackoutTurnOffCapsLock").checked = !!state.blackoutTurnOffCapsLock;
+            document.getElementById("blackoutTurnOffNumLock").checked = !!state.blackoutTurnOffNumLock;
+            document.getElementById("blackoutTurnOffScrollLock").checked = !!state.blackoutTurnOffScrollLock;
+            document.getElementById("blackoutOpenDummyWindow").checked = !!state.blackoutOpenDummyWindow;
 
             const pushover = state.pushover || {};
             document.getElementById("pushoverEnabled").checked = !!pushover.enabled;
@@ -2294,6 +2357,27 @@ namespace SystemSquire
 
         document.getElementById("testPushoverBtn").addEventListener("click", () => {
             runAction("/api/action/pushover-test", {}, "Test notification sent.");
+        });
+
+        document.getElementById("openDummyWindowBtn").addEventListener("click", () => {
+            runAction("/api/action/dummy-window-open", {}, "Dummy window opened.");
+        });
+
+        document.getElementById("copyDummyWindowPathBtn").addEventListener("click", () => {
+            const dummyPath = (currentState?.dummyWindowPath || "").trim();
+            if (!dummyPath) {
+                showMessage("Dummy window path is unavailable.", true);
+                return;
+            }
+
+            if (!navigator.clipboard || !navigator.clipboard.writeText) {
+                showMessage(`Dummy window path: ${dummyPath}`);
+                return;
+            }
+
+            navigator.clipboard.writeText(dummyPath)
+                .then(() => showMessage(`Copied: ${dummyPath}`))
+                .catch(() => showMessage(`Dummy window path: ${dummyPath}`));
         });
 
         document.getElementById("addKillAppBtn").addEventListener("click", () => addSelectedApp("runningAppsKill", "killAppsList"));
