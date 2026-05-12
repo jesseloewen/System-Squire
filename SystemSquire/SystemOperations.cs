@@ -98,6 +98,7 @@ namespace SystemSquire
         private static readonly TimeSpan BlackoutExitSettleWindow = TimeSpan.FromMilliseconds(700);
         private const int DummyWindowActivationRetryCount = 10;
         private const int DummyWindowActivationRetryDelayMs = 100;
+        private const int DummyWindowPostActivationSettleDelayMs = 1000;
         private bool _shutdownActive = false;
         private bool _cooldownActive = false;
         private CancellationTokenSource? _shutdownCts;
@@ -332,39 +333,25 @@ namespace SystemSquire
                     if (existingProcess != null)
                     {
                         _dummyWindowProcess = existingProcess;
-                        TryActivateDummyWindow(existingProcess);
-                        message = "Dummy window already open.";
+                        bool activated = TryActivateDummyWindow(existingProcess);
+                        message = activated
+                            ? "Dummy window already open."
+                            : "Dummy window already open but activation was not confirmed.";
                         OnStatusChanged(message);
                         return true;
                     }
 
-                    string executablePath = ResolveDummyWindowExecutablePath();
-                    if (!File.Exists(executablePath))
+                    if (!TryStartDummyWindowProcess(out Process? process, out message) || process == null)
                     {
-                        message = $"Dummy window executable not found: {executablePath}";
-                        OnStatusChanged($"Warning: {message}");
-                        return false;
-                    }
-
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = executablePath,
-                        WorkingDirectory = Path.GetDirectoryName(executablePath) ?? AppContext.BaseDirectory,
-                        CreateNoWindow = false,
-                        UseShellExecute = false
-                    };
-
-                    Process? process = Process.Start(psi);
-                    if (process == null)
-                    {
-                        message = "Dummy window failed to start.";
                         OnStatusChanged($"Warning: {message}");
                         return false;
                     }
 
                     _dummyWindowProcess = process;
-                    _ = Task.Run(() => TryActivateDummyWindow(process));
-                    message = "Dummy window opened.";
+                    bool startedProcessActivated = TryActivateDummyWindow(process);
+                    message = startedProcessActivated
+                        ? "Dummy window opened."
+                        : "Dummy window opened but activation was not confirmed.";
                     OnStatusChanged(message);
                     return true;
                 }
@@ -382,36 +369,45 @@ namespace SystemSquire
             return ResolveDummyWindowExecutablePath();
         }
 
+        public bool OpenDummyWindowForBlackout(out string message)
+        {
+            try
+            {
+                lock (_dummyWindowSync)
+                {
+                    CloseAllDummyWindowProcessesUnderLock();
+
+                    if (!TryStartDummyWindowProcess(out Process? process, out message) || process == null)
+                    {
+                        OnStatusChanged($"Warning: {message}");
+                        return false;
+                    }
+
+                    _dummyWindowProcess = process;
+                    bool activated = TryActivateDummyWindow(process);
+                    message = activated
+                        ? "Dummy window restarted for blackout."
+                        : "Dummy window restarted for blackout but activation was not confirmed.";
+                    OnStatusChanged(message);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                message = $"Unable to restart dummy window for blackout: {ex.Message}";
+                OnStatusChanged($"Warning: {message}");
+                return false;
+            }
+        }
+
         public void CloseDummyWindow(bool suppressStatus = false)
         {
             try
             {
-                var processesToClose = new List<Process>();
-
+                bool closedAny;
                 lock (_dummyWindowSync)
                 {
-                    if (_dummyWindowProcess != null)
-                    {
-                        processesToClose.Add(_dummyWindowProcess);
-                        _dummyWindowProcess = null;
-                    }
-                }
-
-                foreach (Process process in Process.GetProcessesByName(DummyWindowProcessName))
-                {
-                    if (processesToClose.Any(candidate => candidate.Id == process.Id))
-                    {
-                        process.Dispose();
-                        continue;
-                    }
-
-                    processesToClose.Add(process);
-                }
-
-                bool closedAny = false;
-                foreach (Process process in processesToClose)
-                {
-                    closedAny |= TryCloseDummyWindowProcess(process);
+                    closedAny = CloseAllDummyWindowProcessesUnderLock();
                 }
 
                 if (closedAny && !suppressStatus)
@@ -578,7 +574,13 @@ namespace SystemSquire
                 bool closeDummyWindowOnExit = false;
                 if (openDummyWindow)
                 {
-                    closeDummyWindowOnExit = OpenDummyWindow(out _);
+                    closeDummyWindowOnExit = OpenDummyWindowForBlackout(out _);
+
+                    if (closeDummyWindowOnExit)
+                    {
+                        // Give foreground observers a short window to see the active dummy exe.
+                        Thread.Sleep(DummyWindowPostActivationSettleDelayMs);
+                    }
                 }
 
                 if (blackoutSnapshot.HasAnySelection)
@@ -749,6 +751,95 @@ namespace SystemSquire
             return Path.Combine(AppContext.BaseDirectory, "Tools", DummyWindowExecutableName);
         }
 
+        private bool CloseAllDummyWindowProcessesUnderLock()
+        {
+            if (_dummyWindowProcess != null)
+            {
+                try
+                {
+                    _dummyWindowProcess.Dispose();
+                }
+                catch
+                {
+                    // Ignore stale process handle disposal errors.
+                }
+
+                _dummyWindowProcess = null;
+            }
+
+            return CloseAllDummyWindowProcesses();
+        }
+
+        private static bool TryStartDummyWindowProcess(out Process? process, out string message)
+        {
+            process = null;
+            message = string.Empty;
+
+            string executablePath = ResolveDummyWindowExecutablePath();
+            if (!File.Exists(executablePath))
+            {
+                message = $"Dummy window executable not found: {executablePath}";
+                return false;
+            }
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = executablePath,
+                WorkingDirectory = Path.GetDirectoryName(executablePath) ?? AppContext.BaseDirectory,
+                CreateNoWindow = false,
+                UseShellExecute = false
+            };
+
+            process = Process.Start(psi);
+            if (process == null)
+            {
+                message = "Dummy window failed to start.";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool CloseAllDummyWindowProcesses()
+        {
+            var processesToClose = new List<Process>();
+            var seenProcessIds = new HashSet<int>();
+
+            foreach (Process process in Process.GetProcessesByName(DummyWindowProcessName))
+            {
+                try
+                {
+                    if (seenProcessIds.Add(process.Id))
+                    {
+                        processesToClose.Add(process);
+                    }
+                    else
+                    {
+                        process.Dispose();
+                    }
+                }
+                catch
+                {
+                    try
+                    {
+                        process.Dispose();
+                    }
+                    catch
+                    {
+                        // Ignore dispose failures.
+                    }
+                }
+            }
+
+            bool closedAny = false;
+            foreach (Process process in processesToClose)
+            {
+                closedAny |= TryCloseDummyWindowProcess(process);
+            }
+
+            return closedAny;
+        }
+
         private Process? TryGetExistingDummyWindowProcess()
         {
             if (_dummyWindowProcess != null)
@@ -826,13 +917,13 @@ namespace SystemSquire
             }
         }
 
-        private static void TryActivateDummyWindow(Process process)
+        private static bool TryActivateDummyWindow(Process process)
         {
             try
             {
                 if (process.HasExited)
                 {
-                    return;
+                    return false;
                 }
 
                 try
@@ -848,15 +939,22 @@ namespace SystemSquire
                 {
                     if (process.HasExited)
                     {
-                        return;
+                        return false;
                     }
 
                     IntPtr windowHandle = process.MainWindowHandle;
                     if (windowHandle != IntPtr.Zero)
                     {
                         ShowWindowAsync(windowHandle, SW_RESTORE);
-                        SetForegroundWindow(windowHandle);
-                        return;
+                        SetWindowPos(windowHandle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                        SetWindowPos(windowHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+                        BringWindowToTop(windowHandle);
+                        bool foregroundSet = SetForegroundWindow(windowHandle);
+                        IntPtr foregroundWindow = GetForegroundWindow();
+                        if (foregroundSet || foregroundWindow == windowHandle)
+                        {
+                            return true;
+                        }
                     }
 
                     Thread.Sleep(DummyWindowActivationRetryDelayMs);
@@ -866,6 +964,8 @@ namespace SystemSquire
             {
                 // Best effort only.
             }
+
+            return false;
         }
 
         private static void EnsureLockKeyState(byte virtualKey, bool enabled)
@@ -1750,6 +1850,10 @@ namespace SystemSquire
         private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
         private const uint KEYEVENTF_KEYUP = 0x0002;
         private const int SW_RESTORE = 9;
+        private static readonly IntPtr HWND_TOPMOST = new(-1);
+        private static readonly IntPtr HWND_NOTOPMOST = new(-2);
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
 
         [StructLayout(LayoutKind.Sequential)]
         private struct LASTINPUTINFO
@@ -1778,6 +1882,22 @@ namespace SystemSquire
 
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern bool BringWindowToTop(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SetWindowPos(
+            IntPtr hWnd,
+            IntPtr hWndInsertAfter,
+            int X,
+            int Y,
+            int cx,
+            int cy,
+            uint uFlags);
         #endregion
     }
 }
