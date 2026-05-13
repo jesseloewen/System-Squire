@@ -98,7 +98,7 @@ namespace SystemSquire
         private static readonly TimeSpan BlackoutExitSettleWindow = TimeSpan.FromMilliseconds(700);
         private const int DummyWindowActivationRetryCount = 10;
         private const int DummyWindowActivationRetryDelayMs = 100;
-        private const int DummyWindowPostActivationSettleDelayMs = 1000;
+        private const int DummyWindowPostActivationSettleDelayMs = 2000;
         private bool _shutdownActive = false;
         private bool _cooldownActive = false;
         private CancellationTokenSource? _shutdownCts;
@@ -591,16 +591,32 @@ namespace SystemSquire
                 StartBlackoutRestoreWatch(
                     blackoutSnapshot.HasAnySelection ? blackoutSnapshot : null,
                     closeDummyWindowOnExit);
-                
-                // Turn off monitors
-                const int SC_MONITORPOWER = 0xF170;
-                const int MONITOR_OFF = 2;
-                
-                SendMessage(HWND_BROADCAST, WM_SYSCOMMAND, (IntPtr)SC_MONITORPOWER, (IntPtr)MONITOR_OFF);
+
+                TurnOffMonitorsForBlackout();
             }
             catch (Exception ex)
             {
                 OnStatusChanged($"Error: {ex.Message}");
+            }
+        }
+
+        private void TurnOffMonitorsForBlackout()
+        {
+            const int SC_MONITORPOWER = 0xF170;
+            const int MONITOR_OFF = 2;
+
+            IntPtr sendResult = SendMessageTimeout(
+                new IntPtr(HWND_BROADCAST),
+                WM_SYSCOMMAND,
+                (UIntPtr)SC_MONITORPOWER,
+                (IntPtr)MONITOR_OFF,
+                SMTO_ABORTIFHUNG,
+                1000,
+                out _);
+
+            if (sendResult == IntPtr.Zero)
+            {
+                OnStatusChanged("Warning: Monitor power-off broadcast timed out; blackout may not affect every display.");
             }
         }
 
@@ -797,6 +813,9 @@ namespace SystemSquire
                 return false;
             }
 
+            // Allow the new process to promote itself to foreground.
+            AllowSetForegroundWindow((uint)process.Id);
+
             return true;
         }
 
@@ -926,6 +945,9 @@ namespace SystemSquire
                     return false;
                 }
 
+                AllowSetForegroundWindow((uint)process.Id);
+                AllowSetForegroundWindow(ASFW_ANY);
+
                 try
                 {
                     process.WaitForInputIdle(1500);
@@ -942,16 +964,11 @@ namespace SystemSquire
                         return false;
                     }
 
+                    process.Refresh();
                     IntPtr windowHandle = process.MainWindowHandle;
                     if (windowHandle != IntPtr.Zero)
                     {
-                        ShowWindowAsync(windowHandle, SW_RESTORE);
-                        SetWindowPos(windowHandle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-                        SetWindowPos(windowHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-                        BringWindowToTop(windowHandle);
-                        bool foregroundSet = SetForegroundWindow(windowHandle);
-                        IntPtr foregroundWindow = GetForegroundWindow();
-                        if (foregroundSet || foregroundWindow == windowHandle)
+                        if (TryForceForegroundWindow(windowHandle))
                         {
                             return true;
                         }
@@ -966,6 +983,55 @@ namespace SystemSquire
             }
 
             return false;
+        }
+
+        private static bool TryForceForegroundWindow(IntPtr windowHandle)
+        {
+            if (windowHandle == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            ShowWindowAsync(windowHandle, SW_RESTORE);
+            SetWindowPos(windowHandle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+            SetWindowPos(windowHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+            BringWindowToTop(windowHandle);
+
+            bool foregroundSet = SetForegroundWindow(windowHandle);
+            if (foregroundSet || GetForegroundWindow() == windowHandle)
+            {
+                return true;
+            }
+
+            IntPtr foregroundWindow = GetForegroundWindow();
+            uint foregroundThread = foregroundWindow == IntPtr.Zero
+                ? 0
+                : GetWindowThreadProcessId(foregroundWindow, out _);
+            uint currentThread = GetCurrentThreadId();
+            bool attached = false;
+
+            try
+            {
+                if (foregroundThread != 0 && foregroundThread != currentThread)
+                {
+                    attached = AttachThreadInput(currentThread, foregroundThread, true);
+                }
+
+                ShowWindowAsync(windowHandle, SW_RESTORE);
+                BringWindowToTop(windowHandle);
+                SetActiveWindow(windowHandle);
+                SetFocus(windowHandle);
+                SetForegroundWindow(windowHandle);
+            }
+            finally
+            {
+                if (attached)
+                {
+                    AttachThreadInput(currentThread, foregroundThread, false);
+                }
+            }
+
+            return GetForegroundWindow() == windowHandle;
         }
 
         private static void EnsureLockKeyState(byte virtualKey, bool enabled)
@@ -1849,7 +1915,9 @@ namespace SystemSquire
         private const byte LOCK_KEY_SCAN_CODE = 0x45;
         private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
         private const uint KEYEVENTF_KEYUP = 0x0002;
+        private const uint SMTO_ABORTIFHUNG = 0x0002;
         private const int SW_RESTORE = 9;
+        private const uint ASFW_ANY = 0xFFFFFFFF;
         private static readonly IntPtr HWND_TOPMOST = new(-1);
         private static readonly IntPtr HWND_NOTOPMOST = new(-2);
         private const uint SWP_NOSIZE = 0x0001;
@@ -1862,8 +1930,15 @@ namespace SystemSquire
             public uint dwTime;
         }
 
-        [DllImport("user32.dll")]
-        private static extern IntPtr SendMessage(int hWnd, int hMsg, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr SendMessageTimeout(
+            IntPtr hWnd,
+            int Msg,
+            UIntPtr wParam,
+            IntPtr lParam,
+            uint fuFlags,
+            uint uTimeout,
+            out UIntPtr lpdwResult);
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool LockWorkStation();
@@ -1883,8 +1958,26 @@ namespace SystemSquire
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool AllowSetForegroundWindow(uint dwProcessId);
+
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        [DllImport("kernel32.dll")]
+        private static extern uint GetCurrentThreadId();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SetActiveWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr SetFocus(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         private static extern bool BringWindowToTop(IntPtr hWnd);

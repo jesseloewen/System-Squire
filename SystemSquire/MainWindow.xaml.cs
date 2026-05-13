@@ -890,27 +890,30 @@ namespace SystemSquire
 
         private void OnSystemStatusChanged(object? sender, string status)
         {
-            Dispatcher.Invoke(() =>
+            if (!Dispatcher.CheckAccess())
             {
-                _latestSystemStatus = status;
-                StatusText.Text = status;
-                
-                if (status.Contains("Error") || status.Contains("Warning"))
-                {
-                    StatusIndicator.Fill = new SolidColorBrush(Color.FromRgb(231, 76, 60));
-                    StatusText.Foreground = new SolidColorBrush(Color.FromRgb(231, 76, 60));
-                }
-                else if (status.Contains("Cooldown"))
-                {
-                    StatusIndicator.Fill = new SolidColorBrush(Color.FromRgb(243, 156, 18));
-                    StatusText.Foreground = new SolidColorBrush(Color.FromRgb(243, 156, 18));
-                }
-                else
-                {
-                    StatusIndicator.Fill = new SolidColorBrush(Color.FromRgb(46, 204, 113));
-                    StatusText.Foreground = new SolidColorBrush(Color.FromRgb(46, 204, 113));
-                }
-            });
+                _ = Dispatcher.BeginInvoke(new Action(() => OnSystemStatusChanged(sender, status)));
+                return;
+            }
+
+            _latestSystemStatus = status;
+            StatusText.Text = status;
+
+            if (status.Contains("Error") || status.Contains("Warning"))
+            {
+                StatusIndicator.Fill = new SolidColorBrush(Color.FromRgb(231, 76, 60));
+                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(231, 76, 60));
+            }
+            else if (status.Contains("Cooldown"))
+            {
+                StatusIndicator.Fill = new SolidColorBrush(Color.FromRgb(243, 156, 18));
+                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(243, 156, 18));
+            }
+            else
+            {
+                StatusIndicator.Fill = new SolidColorBrush(Color.FromRgb(46, 204, 113));
+                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(46, 204, 113));
+            }
         }
 
         private void RecordShutdownHotkey_Click(object sender, RoutedEventArgs e)
@@ -1550,10 +1553,13 @@ namespace SystemSquire
 
         private void OnWebServiceStatusChanged(object? sender, string message)
         {
-            Dispatcher.Invoke(() =>
+            if (!Dispatcher.CheckAccess())
             {
-                UpdateWebServiceStatusDisplay(message);
-            });
+                _ = Dispatcher.BeginInvoke(new Action(() => OnWebServiceStatusChanged(sender, message)));
+                return;
+            }
+
+            UpdateWebServiceStatusDisplay(message);
         }
 
         private void UpdateWebServiceStatusDisplay(string? overrideMessage = null)
