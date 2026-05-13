@@ -1,32 +1,28 @@
-# System Squire v1.2.2
+# System Squire v1.2.3
 
-Smarter blackout controls. New dummy window support. Better update awareness.
+Blackout stability fixes. Better dummy window focus handling. Smoother UI status updates.
 
-[Download v1.2.2 Installer](https://github.com/jesseloewen/System-Squire/releases/download/v1.2.2/SystemSquireSetup-1.2.2.exe)
+[Download v1.2.3 Installer](https://github.com/jesseloewen/System-Squire/releases/download/v1.2.3/SystemSquireSetup-1.2.3.exe)
 
-## Why this is v1.2.2
+## Why this is v1.2.3
 
-This release focuses on blackout reliability, remote control flexibility, and update flow improvements after v1.2.1:
+This patch release focuses on bug fixes and reliability improvements after v1.2.2:
 
-- Added finer blackout behavior controls for keyboard lock keys
-- Introduced a dedicated dummy window tool for blackout-related workflows
-- Improved update detection and install flow behavior in the main UI
+- Prevents blackout hangs caused by unresponsive windows or display drivers during monitor power-off
+- Improves dummy window foreground activation reliability during blackout workflows
+- Reduces risk of UI stalls when processing status updates
 
-## What is new
+## What is fixed
 
-- Added blackout options to automatically turn off Caps Lock, Num Lock, and Scroll Lock when blackout is triggered
-- Added an option to open a dedicated dummy window during blackout scenarios
-- Added remote web API support to open the dummy window directly
-- Added main window controls to open the dummy window and copy its executable path
-- Strengthened blackout trigger handling through UI-dispatch-safe execution paths
-- Improved cleanup on shutdown to stop blackout restore watchers and close dummy windows more reliably
-- Improved GitHub release checks to consider a broader release set and better handle stable versus pre-release version states
-- Improved update button behavior so Check, Download, and Install actions reflect the current update state more clearly
-- Added a new SystemSquireDummyWindow project and included its built executable in the packaged Tools folder
+- Reworked blackout monitor power-off signaling to use timeout-safe messaging, avoiding hangs when broadcast targets are unresponsive
+- Added warning logging when monitor power-off signaling times out or fails
+- Improved dummy window foreground acquisition with stronger focus handoff logic and more stable activation timing
+- Increased dummy window post-activation settle timing for more consistent behavior
+- Updated main window status updates to use non-blocking UI dispatch paths for better responsiveness
 
 ## Quick summary for users
 
-If you are already on System Squire, v1.2.2 gives you more control over blackout behavior, adds new remote and UI support for a dummy window tool, and makes update handling clearer and more reliable.
+If you are already on System Squire, v1.2.3 is a reliability update that makes blackout behavior safer, dummy window activation more consistent, and the UI less likely to stall during state changes.
 
 ## Install
 
